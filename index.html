@@ -176,7 +176,7 @@
                 <div class="card" data-action="burn"><div style="font-weight:800">🔥 Brûler</div><div style="font-size:13px;margin-top:6px;opacity:0.9">Coût -2 charges • inflige 3 dégâts sur 3 tours (1/tour)</div></div>
                 <div class="card" data-action="riposte"><div style="font-weight:800">⚔️ Riposte</div><div style="font-size:13px;margin-top:6px;opacity:0.9">Coût -2 charges • bloque et renvoie 2 dégâts si bloqué</div></div>
                 <div class="card" data-action="furie"><div style="font-weight:800">😡 Furie</div><div style="font-size:13px;margin-top:6px;opacity:0.9">Coût -2 charges • inflige 4 dégâts à l'ennemi, vous fait perdre 3 PV</div></div>
-                <div class="card" data-action="armure"><div style="font-weight:800">🛡️ Armure magique</div><div style="font-size:13px;margin-top:6px;opacity:0.9">Coût -4 charges • immunise contre les dégâts ce tour</div></div>
+                <div class="card" data-action="armure"><div style="font-weight:800">🌐 Armure magique</div><div style="font-size:13px;margin-top:6px;opacity:0.9">Coût -3 charges • immunise contre les dégâts ce tour</div></div>
                 <div class="card" data-action="courtcircuit"><div style="font-weight:800">🪫 Court circuit</div><div style="font-size:13px;margin-top:6px;opacity:0.9">Contre protection: +2 charges | Sinon: +1 charge, -2 PV à soi</div></div>
                 <div class="card" data-action="tourmente"><div style="font-weight:800">👻 Tourmente</div><div style="font-size:13px;margin-top:6px;opacity:0.9">0 charges • Punition pour répétitions (fin du tour)</div></div>
                 <div class="card" data-action="vampirisme"><div style="font-weight:800">🩸 Vampirisme</div><div style="font-size:13px;margin-top:6px;opacity:0.9">0 charges • Rend 1 PV si bloqué par "armure magique" ou "bloquer"</div></div>
@@ -318,7 +318,7 @@
       if(act==='burn') return '🔥 Brûler';
       if(act==='riposte') return '⚔️ Riposte';
       if(act==='furie') return '😡 Furie';
-      if(act==='armure') return '🛡️ Armure magique';
+      if(act==='armure') return '🌐 Armure magique';
       if(act==='courtcircuit') return '🪫 Court circuit';
       if(act==='tourmente') return '👻 Tourmente';
       if(act==='vampirisme') return '🩸 Vampirisme';
@@ -332,7 +332,7 @@
       if(act==='burn') return '-2 charges | Applique Brûlure: 3 tours / 1 dmg par tour';
       if(act==='riposte') return '-2 charges | Bloque et renvoie 2 dégâts si bloqué';
       if(act==='furie') return '-2 charges | Inflige 4 dégâts à l\'ennemi, vous fait perdre 3 PV';
-      if(act==='armure') return '-4 charges | Immunise contre les dégâts ce tour';
+      if(act==='armure') return '-3 charges | Immunise contre les dégâts ce tour';
       if(act==='courtcircuit') return 'Contre protection: +2 charges | Sinon: +1 charge, -2 PV à soi';
       if(act==='tourmente') return '0 charges | Punition pour répétitions (fin du tour)';
       if(act==='vampirisme') return '0 charges | Rend 1 PV si bloqué par "armure magique" ou "bloquer"';
@@ -404,7 +404,7 @@
       if(action==='burn') return player.charges >= 2;
       if(action==='riposte') return player.charges >= 2;
       if(action==='furie') return player.charges >= 2;
-      if(action==='armure') return player.charges >= 4;
+      if(action==='armure') return player.charges >= 3;
       if(action==='courtcircuit') return true; // always possible
       if(action==='tourmente') return true; // free, but only at step 0
       if(action==='vampirisme') return true; // free
@@ -419,7 +419,7 @@
       if(action==='burn') return -2;
       if(action==='riposte') return -2;
       if(action==='furie') return -2;
-      if(action==='armure') return -4;
+      if(action==='armure') return -3;
       if(action==='courtcircuit') return 0; // handled separately
       if(action==='tourmente') return 0;
       return 0;
