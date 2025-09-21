@@ -1,0 +1,740 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Opération 007 — Jeu 1 page</title>
+  <style>
+    :root{
+      --bg1: linear-gradient(135deg,#061021 0%,#041425 40%,#061223 100%);
+      --card: rgba(255,255,255,0.04);
+      --glass: rgba(255,255,255,0.03);
+      --accent: linear-gradient(90deg,#6ee7b7,#60a5fa);
+      --glass-border: rgba(255,255,255,0.06);
+      --text: #e6eef8;
+      --hp-bg: rgba(255,255,255,0.06);
+      --hp-fill: linear-gradient(90deg,#60ffa8,#00a3ff);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      --step-duration: 3000ms; /* durée d'un step */
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;color:var(--text);background:var(--bg1);}
+
+    /* full-page layout */
+    .app{height:100vh;width:100vw;display:flex;align-items:stretch;justify-content:center}
+    .board{flex:1;display:grid;grid-template-columns:360px 1fr;gap:18px;padding:22px;height:100%;}
+
+    /* left panel (joueurs + règles) */
+    .side{padding:20px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:10px;border:1px solid var(--glass-border);backdrop-filter: blur(6px);box-shadow:0 8px 40px rgba(2,6,23,0.6)}
+    h1{margin:0;font-size:20px;letter-spacing:0.6px}
+    .players{display:flex;flex-direction:column;gap:14px;margin-top:14px}
+    .player{display:flex;align-items:center;gap:12px;padding:12px;border-radius:10px;background:var(--card);border:1px solid rgba(255,255,255,0.02)}
+    .avatar{width:64px;height:64px;border-radius:12px;background:linear-gradient(135deg,#0ea5e9,#7c3aed);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;position:relative}
+    .pmeta{flex:1}
+    .hp{font-weight:800}
+    .charges{font-size:13px;opacity:0.9}
+
+    .hp-bar{height:12px;background:var(--hp-bg);border-radius:10px;overflow:hidden;margin-top:8px;border:1px solid rgba(255,255,255,0.03)}
+    .hp-fill{height:100%;width:100%;background:var(--hp-fill);transform-origin:left;transition:width 350ms ease}
+    .hp-text{font-size:12px;opacity:0.9;margin-top:6px}
+
+    .rules{font-size:13px;opacity:0.9;margin-top:8px}
+
+    /* main area larger */
+    .main{padding:18px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.003));border:1px solid var(--glass-border);display:flex;flex-direction:column}
+    .stage{display:flex;flex-direction:column;gap:12px;flex:1}
+    .status-row{display:flex;align-items:center;justify-content:space-between}
+    .log{height:130px;overflow:auto;padding:12px;background:rgba(0,0,0,0.18);border-radius:8px;border:1px solid rgba(255,255,255,0.02)}
+
+    .selection-area{display:flex;gap:14px;align-items:flex-start}
+    .slots{display:flex;gap:12px}
+    .slot{width:140px;height:160px;border-radius:12px;background:var(--card);display:flex;align-items:center;justify-content:center;flex-direction:column;padding:12px;border:1px solid rgba(255,255,255,0.02)}
+    .slot .label{font-weight:700;margin-top:6px}
+    .cards{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+    .card{padding:14px 18px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.03);cursor:pointer;min-width:160px;text-align:center;font-size:15px}
+    .card.disabled{opacity:0.45;cursor:not-allowed}
+    .controls{display:flex;gap:8px;align-items:center}
+    button{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:10px 14px;border-radius:10px;color:var(--text);cursor:pointer}
+    button.primary{background:var(--accent);color:#072033;border:none;padding:10px 14px}
+
+    .hidden-mask{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+
+    /* arena big and immersive */
+    .arena{margin-top:18px;border-radius:10px;padding:18px;background:linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0.005));display:flex;gap:18px;align-items:center;flex:1}
+    .arena .side-panel{flex:1;display:flex;flex-direction:column;align-items:center;gap:12px;position:relative}
+    .action-card{width:240px;height:140px;border-radius:12px;background:rgba(255,255,255,0.03);display:flex;align-items:center;justify-content:center;flex-direction:column;border:1px solid rgba(255,255,255,0.03);opacity:0;transform:translateY(18px);position:relative}
+    .action-card.show{animation:popIn 420ms cubic-bezier(.2,.9,.3,1) forwards}
+    @keyframes popIn{from{opacity:0;transform:translateY(18px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+
+    /* colored shadows */
+    .action-card.charge{box-shadow:0 10px 40px rgba(102,255,188,0.06);}    
+    .action-card.fire{box-shadow:0 10px 40px rgba(255,100,100,0.08)}
+    .action-card.special{box-shadow:0 10px 40px rgba(180,120,255,0.08)}
+    .action-card.block{box-shadow:0 10px 40px rgba(200,200,200,0.05)}
+    .action-card.burn{box-shadow:0 10px 40px rgba(255,120,60,0.08)}
+    .action-card.riposte{box-shadow:0 10px 40px rgba(255,200,120,0.08)}
+    .action-card.courtcircuit{box-shadow:0 10px 40px rgba(150,150,255,0.08)}
+    .action-card.tourmente{box-shadow:0 10px 40px rgba(100,100,150,0.08)}
+
+    .floating-damage{position:absolute;top:-22px;font-weight:900;font-size:16px;opacity:0;animation:floatUp 900ms forwards}
+    @keyframes floatUp{0%{transform:translateY(0);opacity:1}100%{transform:translateY(-48px);opacity:0}}
+
+    .avatar.flash{animation:flashHit 350ms}
+    @keyframes flashHit{0%{box-shadow:0 0 0 rgba(255,0,0,0)}50%{box-shadow:0 0 22px rgba(255,0,0,0.4)}100%{box-shadow:0 0 0 rgba(255,0,0,0)}}
+
+    /* attack animation: the action card pulses/moves toward opponent */
+    .action-card.attack-right{animation:attackRight var(--step-duration) ease-in-out forwards}
+    .action-card.attack-left{animation:attackLeft var(--step-duration) ease-in-out forwards}
+    @keyframes attackRight{0%{transform:translateX(0) scale(1)}20%{transform:translateX(18px) scale(1.02)}80%{transform:translateX(18px) scale(1.02)}100%{transform:translateX(0) scale(1)}}
+    @keyframes attackLeft{0%{transform:translateX(0) scale(1)}20%{transform:translateX(-18px) scale(1.02)}80%{transform:translateX(-18px) scale(1.02)}100%{transform:translateX(0) scale(1)}}
+
+    .big-cta{display:flex;gap:12px}
+    footer{margin-top:10px;font-size:12px;opacity:0.7}
+
+    /* responsive */
+    @media (max-width:900px){
+      .board{grid-template-columns:1fr;grid-auto-rows:min-content}
+      .slot{width:110px;height:140px}
+      .action-card{width:180px;height:110px}
+      .cards .card{min-width:120px}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="board">
+      <div class="side">
+        <h1>Opération 007 — Local 1v1</h1>
+        <div class="players">
+          <div class="player" id="player1Box">
+            <div class="avatar" id="avatar1">J1</div>
+            <div class="pmeta">
+              <div class="hp">Joueur 1</div>
+              <div class="hp-bar"><div id="p1hpFill" class="hp-fill"></div></div>
+              <div class="hp-text">PV: <span id="p1hp">6</span></div>
+              <div class="charges">Charges: <span id="p1charges">0</span></div>
+            </div>
+            <div id="p1status"></div>
+          </div>
+          <div class="player" id="player2Box">
+            <div class="avatar" id="avatar2">J2</div>
+            <div class="pmeta">
+              <div class="hp">Joueur 2</div>
+              <div class="hp-bar"><div id="p2hpFill" class="hp-fill"></div></div>
+              <div class="hp-text">PV: <span id="p2hp">6</span></div>
+              <div class="charges">Charges: <span id="p2charges">0</span></div>
+            </div>
+            <div id="p2status"></div>
+          </div>
+        </div>
+
+        <div class="rules">
+          <strong>Règles rapides:</strong>
+          <ul style="margin:6px 0 0 18px;padding:0;font-size:13px;line-height:1.4">
+            <li>PV initiaux: 6 (jauges visibles)</li>
+            <li>Sélection: chaque tour chacun choisit une séquence de 3 cartes (tour par tour, caché)</li>
+            <li>Cartes: <strong>Charger ⚡</strong>, <strong>Tirer 🔫</strong>, <strong>B. Blast 🔵</strong>, <strong>Bloquer 🛡️</strong>, <strong>Brûler 🔥</strong>, <strong>Riposte ⚔️</strong>, <strong>Furie 😡</strong>, <strong>Armure magique 🛡️</strong>, <strong>Court circuit 🪫</strong>, <strong>Tourmente 👻</strong>, <strong>Vampirisme 🩸</strong></li>
+            <li>Charges se conservent entre les tours</li>
+            <li>Résolution: 3 étapes — 3s par étape (animations visibles)</li>
+          </ul>
+        </div>
+
+        <footer style="margin-top:14px">Interface stylée startup • Local play</footer>
+      </div>
+
+      <div class="main">
+        <div class="stage">
+          <div class="status-row">
+            <div>Etat: <strong id="gameState">En attente J1</strong></div>
+            <div class="big-cta">
+              <button id="resetBtn">Réinitialiser</button>
+              <button id="autoFillBtn">Remplir aléatoire</button>
+            </div>
+          </div>
+
+          <div class="selection-area">
+            <div style="flex:1">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <div><strong id="currentPlayer">J1</strong> — Choisir 3 cartes</div>
+                <div class="controls">
+                  <button id="clearSel">Effacer</button>
+                  <button id="nextBtn" class="primary" disabled>Suivant</button>
+                </div>
+              </div>
+
+              <div style="margin-top:12px" class="slots" id="slots">
+                <div class="slot" data-slot="0"><div class="hidden-mask" id="slot0">—</div><div class="label">1</div></div>
+                <div class="slot" data-slot="1"><div class="hidden-mask" id="slot1">—</div><div class="label">2</div></div>
+                <div class="slot" data-slot="2"><div class="hidden-mask" id="slot2">—</div><div class="label">3</div></div>
+              </div>
+
+              <div class="cards" id="cards">
+                <div class="card" data-action="charge"><div style="font-weight:800">⚡ Charger</div><div style="font-size:13px;margin-top:6px;opacity:0.9">+1 charge</div></div>
+                <div class="card" data-action="fire"><div style="font-weight:800">🔫 Tirer</div><div style="font-size:13px;margin-top:6px;opacity:0.9">-1 charge, -1 PV adversaire</div></div>
+                <div class="card" data-action="special"><div style="font-weight:800">🔵 B. Blast</div><div style="font-size:13px;margin-top:6px;opacity:0.9">-3 charges, -5 PV adversaire</div></div>
+                <div class="card" data-action="block"><div style="font-weight:800">🛡️ Bloquer</div><div style="font-size:13px;margin-top:6px;opacity:0.9">Empêche les dégâts ce step (gratuit)</div></div>
+                <div class="card" data-action="burn"><div style="font-weight:800">🔥 Brûler</div><div style="font-size:13px;margin-top:6px;opacity:0.9">Coût -2 charges • inflige 3 dégâts sur 3 tours (1/tour)</div></div>
+                <div class="card" data-action="riposte"><div style="font-weight:800">⚔️ Riposte</div><div style="font-size:13px;margin-top:6px;opacity:0.9">Coût -2 charges • bloque et renvoie 2 dégâts si bloqué</div></div>
+                <div class="card" data-action="furie"><div style="font-weight:800">😡 Furie</div><div style="font-size:13px;margin-top:6px;opacity:0.9">Coût -2 charges • inflige 4 dégâts à l'ennemi, vous fait perdre 3 PV</div></div>
+                <div class="card" data-action="armure"><div style="font-weight:800">🛡️ Armure magique</div><div style="font-size:13px;margin-top:6px;opacity:0.9">Coût -4 charges • immunise contre les dégâts ce tour</div></div>
+                <div class="card" data-action="courtcircuit"><div style="font-weight:800">🪫 Court circuit</div><div style="font-size:13px;margin-top:6px;opacity:0.9">Contre protection: +2 charges | Sinon: +1 charge, -2 PV à soi</div></div>
+                <div class="card" data-action="tourmente"><div style="font-weight:800">👻 Tourmente</div><div style="font-size:13px;margin-top:6px;opacity:0.9">0 charges • Punition pour répétitions (fin du tour)</div></div>
+                <div class="card" data-action="vampirisme"><div style="font-weight:800">🩸 Vampirisme</div><div style="font-size:13px;margin-top:6px;opacity:0.9">0 charges • Rend 1 PV si bloqué par "armure magique" ou "bloquer"</div></div>
+              </div>
+            </div>
+
+            <div style="width:420px">
+              <div style="margin-bottom:12px">Sélections masquées — Attendre que les deux joueurs valident</div>
+              <div class="log" id="log"></div>
+              <div style="display:flex;gap:8px;margin-top:10px;align-items:center;justify-content:space-between">
+                <div style="font-size:13px;opacity:0.85">(Résolution immédiate au clic — 3s par étape)</div>
+                <div><!-- Le bouton 'Lancer séquence' supprimé : utilisez 'Suivant' dans le panneau de sélection --></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- arena: visual resolution area -->
+          <div class="arena" id="arena" aria-hidden="false">
+            <div class="side-panel">
+              <div id="p1Action" class="action-card">—</div>
+              <div style="font-size:14px;opacity:0.85">J1</div>
+            </div>
+
+            <div style="flex:0 0 220px;display:flex;flex-direction:column;align-items:center;gap:8px">
+              <div style="font-size:15px;opacity:0.9">Résolution en direct</div>
+              <div style="font-size:13px;opacity:0.7">Actions révélées et animées</div>
+            </div>
+
+            <div class="side-panel">
+              <div id="p2Action" class="action-card">—</div>
+              <div style="font-size:14px;opacity:0.85">J2</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Game state
+    const MAX_HP = 6;
+    const STEP_MS = 3000; // 3s par step
+    const players = [
+      {id:1,name:'J1',hp:MAX_HP,charges:0,selection:[],burnRemaining:0},
+      {id:2,name:'J2',hp:MAX_HP,charges:0,selection:[],burnRemaining:0}
+    ];
+
+    let activePlayer = 0; // 0 -> J1 choosing, 1 -> J2
+    let validated = [false,false];
+    let phase = 'select'; // select / ready / resolving / ended
+
+    // DOM refs
+    const p1hp = document.getElementById('p1hp');
+    const p2hp = document.getElementById('p2hp');
+    const p1hpFill = document.getElementById('p1hpFill');
+    const p2hpFill = document.getElementById('p2hpFill');
+    const p1charges = document.getElementById('p1charges');
+    const p2charges = document.getElementById('p2charges');
+    const currentPlayerLabel = document.getElementById('currentPlayer');
+    const slots = [document.getElementById('slot0'),document.getElementById('slot1'),document.getElementById('slot2')];
+    const cards = document.getElementById('cards');
+    const nextBtn = document.getElementById('nextBtn');
+    const clearBtn = document.getElementById('clearSel');
+    const logBox = document.getElementById('log');
+    const gameState = document.getElementById('gameState');
+    const resetBtn = document.getElementById('resetBtn');
+    const autoFillBtn = document.getElementById('autoFillBtn');
+    const p1Action = document.getElementById('p1Action');
+    const p2Action = document.getElementById('p2Action');
+    const avatar1 = document.getElementById('avatar1');
+    const avatar2 = document.getElementById('avatar2');
+
+    function writeLog(text){
+      const time = new Date();
+      const hh = String(time.getHours()).padStart(2,'0');
+      const mm = String(time.getMinutes()).padStart(2,'0');
+      logBox.innerHTML = `<div>[${hh}:${mm}] ${text}</div>` + logBox.innerHTML;
+    }
+
+    // Mise à jour des indicateurs visuels pour l'armure et la brûlure
+    function renderStats(){
+      p1hp.textContent = players[0].hp;
+      p2hp.textContent = players[1].hp;
+      p1charges.textContent = '⚡'.repeat(players[0].charges);
+      p2charges.textContent = '⚡'.repeat(players[1].charges);
+      p1hpFill.style.width = Math.max(0, (players[0].hp / MAX_HP) * 100) + '%';
+      p2hpFill.style.width = Math.max(0, (players[1].hp / MAX_HP) * 100) + '%';
+      document.getElementById('p1status').textContent = players[0].burnRemaining > 0 ? '🔥' : (players[0].magicArmor ? '🛡️' : '');
+      document.getElementById('p2status').textContent = players[1].burnRemaining > 0 ? '🔥' : (players[1].magicArmor ? '🛡️' : '');
+    }
+
+    function resetSelections(){
+      players.forEach(p=>{ p.selection = []; p.burn = 0; p.burnDelay = 0; });
+      validated = [false,false];
+      activePlayer = 0;
+      phase = 'select';
+      updateUI();
+      writeLog('Partie réinitialisée. J1 commence.');
+    }
+
+    function updateUI(){
+      renderStats();
+      currentPlayerLabel.textContent = players[activePlayer].name;
+      gameState.textContent = phase === 'select' ? `En attente ${players[activePlayer].name}` : (phase === 'ready' ? 'Prêt — appuyer sur lancer' : (phase==='resolving' ? 'Résolution' : 'Terminé'));
+
+      // show slots (if validated, mask)
+      for(let i=0;i<3;i++){
+        const el = slots[i];
+        const sel = players[activePlayer].selection[i];
+        if(validated[activePlayer]){
+          el.innerHTML = '<div class="hidden-mask">Sélection masquée</div>';
+        }else{
+          el.innerHTML = sel ? `<div style="font-weight:800">${labelFor(sel)}</div><div style="font-size:13px;margin-top:6px">${descFor(sel)}</div>` : '—';
+        }
+      }
+
+      // disable validate if selection not full
+      clearBtn.disabled = players[activePlayer].selection.length === 0 || validated[activePlayer];
+      // Bouton unique 'Suivant' : si en phase de sélection, il sert à valider le joueur actif.
+      if(phase === 'select'){
+        nextBtn.disabled = players[activePlayer].selection.length !== 3 || validated[activePlayer];
+      } else {
+        // si phase ready, le bouton sert à lancer la résolution lorsque les deux joueurs ont validé
+        nextBtn.disabled = !(validated[0] && validated[1]) || phase === 'resolving' || phase === 'ended';
+      }
+
+      // show small indicator on each player's box
+      document.getElementById('p1status').textContent = validated[0] ? '✓ prêt' : '';
+      document.getElementById('p2status').textContent = validated[1] ? '✓ prêt' : '';
+    }
+
+    function labelFor(act){
+      if(!act) return '';
+      if(act==='charge') return '⚡ Charger';
+      if(act==='fire') return '🔫 Tirer';
+      if(act==='special') return '🔵 B. Blast';
+      if(act==='block') return '🛡️ Bloquer';
+      if(act==='burn') return '🔥 Brûler';
+      if(act==='riposte') return '⚔️ Riposte';
+      if(act==='furie') return '😡 Furie';
+      if(act==='armure') return '🛡️ Armure magique';
+      if(act==='courtcircuit') return '🪫 Court circuit';
+      if(act==='tourmente') return '👻 Tourmente';
+      if(act==='vampirisme') return '🩸 Vampirisme';
+      return act;
+    }
+    function descFor(act){
+      if(act==='charge') return '+1 charge';
+      if(act==='fire') return '-1 charge | -1 PV adv';
+      if(act==='special') return '-3 charges | -5 PV adv';
+      if(act==='block') return 'Empêche les dégâts ce step (gratuit)';
+      if(act==='burn') return '-2 charges | Applique Brûlure: 3 tours / 1 dmg par tour';
+      if(act==='riposte') return '-2 charges | Bloque et renvoie 2 dégâts si bloqué';
+      if(act==='furie') return '-2 charges | Inflige 4 dégâts à l\'ennemi, vous fait perdre 3 PV';
+      if(act==='armure') return '-4 charges | Immunise contre les dégâts ce tour';
+      if(act==='courtcircuit') return 'Contre protection: +2 charges | Sinon: +1 charge, -2 PV à soi';
+      if(act==='tourmente') return '0 charges | Punition pour répétitions (fin du tour)';
+      if(act==='vampirisme') return '0 charges | Rend 1 PV si bloqué par "armure magique" ou "bloquer"';
+      return '';
+    }
+
+    // interaction: click card to fill next empty slot for activePlayer
+    cards.addEventListener('click', (e)=>{
+      const card = e.target.closest('.card');
+      if(!card) return;
+      if(phase !== 'select') return;
+      if(validated[activePlayer]) return;
+      const action = card.getAttribute('data-action');
+      if(players[activePlayer].selection.length >=3) return;
+      players[activePlayer].selection.push(action);
+      // Do NOT log the selected action name to avoid leaking choices.
+      writeLog(`${players[activePlayer].name} a sélectionné une carte.`);
+      updateUISlotsForPlayer(activePlayer);
+    });
+
+    function updateUISlotsForPlayer(playerIndex){
+      for(let i=0;i<3;i++){
+        const el = slots[i];
+        const sel = players[playerIndex].selection[i];
+        if(playerIndex === activePlayer && !validated[activePlayer]){
+          el.innerHTML = sel ? `<div style="font-weight:800">${labelFor(sel)}</div><div style="font-size:13px;margin-top:6px">${descFor(sel)}</div>` : '—';
+        } else {
+          el.innerHTML = validated[playerIndex] ? '<div class="hidden-mask">Sélection masquée</div>' : '—';
+        }
+      }
+      nextBtn.disabled = players[activePlayer].selection.length !== 3 || validated[activePlayer];
+      clearBtn.disabled = players[activePlayer].selection.length === 0 || validated[activePlayer];
+    }
+
+    // clear
+    clearBtn.addEventListener('click', ()=>{
+      if(validated[activePlayer]) return;
+      players[activePlayer].selection = [];
+      // Do NOT log the content of selection, only the action of clearing
+      writeLog(`${players[activePlayer].name} efface sa sélection.`);
+      updateUI();
+    });
+
+    // 'Suivant' : valide la sélection du joueur actif, ou lance la résolution si les deux ont validé
+    nextBtn.addEventListener('click', ()=>{
+      if(phase === 'select'){
+        if(players[activePlayer].selection.length !==3) return;
+        validated[activePlayer] = true;
+        writeLog(`${players[activePlayer].name} valide sa séquence (masquée).`);
+        if(activePlayer === 0){ activePlayer = 1; }
+        if(validated[0] && validated[1]){ phase = 'ready'; writeLog('Les deux joueurs ont validé. Prêt à lancer la séquence.'); }
+        updateUI();
+        return;
+      }
+      // si on est en phase 'ready' et que les deux sont validés, démarrer la résolution
+      if(phase === 'ready' && validated[0] && validated[1]){
+        resolveSequences();
+      }
+    });
+
+    // helper for animations
+    function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+    function canPerform(player, action){
+      if(!action) return false;
+      if(action==='charge') return true;
+      if(action==='fire') return player.charges >= 1;
+      if(action==='special') return player.charges >= 3;
+      if(action==='block') return true; // free
+      if(action==='burn') return player.charges >= 2;
+      if(action==='riposte') return player.charges >= 2;
+      if(action==='furie') return player.charges >= 2;
+      if(action==='armure') return player.charges >= 4;
+      if(action==='courtcircuit') return true; // always possible
+      if(action==='tourmente') return true; // free, but only at step 0
+      if(action==='vampirisme') return true; // free
+      return false;
+    }
+    function chargeDeltaFor(action, can){
+      if(!action || !can) return 0;
+      if(action==='charge') return 1;
+      if(action==='fire') return -1;
+      if(action==='special') return -3;
+      if(action==='block') return 0;
+      if(action==='burn') return -2;
+      if(action==='riposte') return -2;
+      if(action==='furie') return -2;
+      if(action==='armure') return -4;
+      if(action==='courtcircuit') return 0; // handled separately
+      if(action==='tourmente') return 0;
+      return 0;
+    }
+    function damageFor(action, can){
+      if(!action || !can) return 0;
+      if(action==='fire') return 1;
+      if(action==='special') return 5;
+      if(action==='furie') return 4;
+      // burn does NOT deal immediate damage; it's a status applied
+      if(action==='tourmente') return 0;
+      return 0;
+    }
+
+    function calculateTourmenteDamage(selection) {
+      const counts = {};
+      selection.forEach(act => {
+        counts[act] = (counts[act] || 0) + 1;
+      });
+      let damage = 0;
+      for (const act in counts) {
+        if (counts[act] > 1) {
+          damage += counts[act] - 1;
+        }
+      }
+      return damage;
+    }
+
+    async function resolveSequences(){
+      phase = 'resolving';
+      updateUI();// At start of TURN, apply pending burn ticks (from previous burns)
+      for(let i=0;i<2;i++){
+        const p = players[i];
+        if(p.burnRemaining>0){
+          p.hp -= 1;
+          p.burnRemaining -= 1;
+          writeLog(`${p.name} subit 1 dmg de Brûlure en début de tour (reste ${p.burnRemaining}).`);
+          flashHit(i===0?avatar1:avatar2);
+        }
+      }
+      renderStats();
+
+      writeLog('Résolution: exécution des séquences (3 étapes)');
+
+      // reveal and animate three steps sequentially to show effects
+      for(let step=0; step<3; step++){
+        const aAct = players[0].selection[step];
+        const bAct = players[1].selection[step];
+
+        // apply burn tick at start of this step for both players
+        
+
+        // reveal actions visually (and log short label)
+        showActionVisual(p1Action, aAct);
+        showActionVisual(p2Action, bAct);
+        writeLog(`Étape ${step+1}: ${players[0].name} => ${labelFor(aAct)} | ${players[1].name} => ${labelFor(bAct)}`);
+
+        // --- split the 3s step into phases for animations ---
+        // 1) reveal & charge animation (0 -> 1.2s)
+        await sleep(1200);
+
+        // check availability (at moment of executing)
+        const aCan = canPerform(players[0], aAct);
+        const bCan = canPerform(players[1], bAct);
+
+        // compute deltas / intents
+        let aDelta = chargeDeltaFor(aAct, aCan);
+        let bDelta = chargeDeltaFor(bAct, bCan);
+        const aIntent = damageFor(aAct, aCan); // damage that a inflicts to b
+        const bIntent = damageFor(bAct, bCan);
+
+        // Handle courtcircuit special logic
+        if(aAct === 'courtcircuit' && aCan){
+          if(bAct === 'block' || bAct === 'armure'){
+            aDelta += 2;
+            writeLog(`${players[0].name} utilise Court circuit contre protection : +2 charges.`);
+          } else {
+            aDelta += 1;
+            players[0].hp -= 2;
+            writeLog(`${players[0].name} utilise Court circuit : +1 charge, subit 2 PV.`);
+            flashHit(avatar1);
+            showFloating('-2', avatar1);
+          }
+        }
+        if(bAct === 'courtcircuit' && bCan){
+          if(aAct === 'block' || aAct === 'armure'){
+            bDelta += 2;
+            writeLog(`${players[1].name} utilise Court circuit contre protection : +2 charges.`);
+          } else {
+            bDelta += 1;
+            players[1].hp -= 2;
+            writeLog(`${players[1].name} utilise Court circuit : +1 charge, subit 2 PV.`);
+            flashHit(avatar2);
+            showFloating('-2', avatar2);
+          }
+        }
+
+        // apply charges simultaneously (visual)
+        players[0].charges += aDelta;
+        players[1].charges += bDelta;
+        showFloating( (aDelta>0? '+'+aDelta : (aDelta<0? String(aDelta) : '0')), avatar1 );
+        showFloating( (bDelta>0? '+'+bDelta : (bDelta<0? String(bDelta) : '0')), avatar2 );
+
+        // small pause (1.2s -> 1.8s)
+        await sleep(600);
+
+        // compute actual damage after defenses
+        let aTakes = bIntent;
+        let bTakes = aIntent;
+        let aReflect = 0;
+        let bReflect = 0;
+        
+        // Gestion spéciale pour la brûlure qui doit être considérée comme une attaque
+        let aBurnBlocked = false;
+        let bBurnBlocked = false;
+
+        // player 0 defense (block or riposte)
+        if(aCan && (aAct==='block' || aAct==='riposte')){
+          if(bIntent>0 || (bAct==='burn' && bCan)){
+            // damage would be blocked (including burn)
+            aTakes = 0;
+            if(bAct==='burn' && bCan){
+              bBurnBlocked = true;
+              writeLog(`${players[0].name} bloque l'attaque de Brûlure de ${players[1].name}.`);
+            }
+            if(aAct==='riposte' && bIntent>0){
+              // reflect 2 dmg to attacker (player1)
+              bReflect += 2;
+              writeLog(`${players[0].name} riposte et renvoie 2 dégâts à ${players[1].name}.`);
+            } else if(bIntent>0) {
+              writeLog(`${players[0].name} bloque les dégâts.`);
+            }
+          }
+        }
+        // player 1 defense
+        if(bCan && (bAct==='block' || bAct==='riposte')){
+          if(aIntent>0 || (aAct==='burn' && aCan)){
+            bTakes = 0;
+            if(aAct==='burn' && aCan){
+              aBurnBlocked = true;
+              writeLog(`${players[1].name} bloque l'attaque de Brûlure de ${players[0].name}.`);
+            }
+            if(bAct==='riposte' && aIntent>0){
+              aReflect += 2;
+              writeLog(`${players[1].name} riposte et renvoie 2 dégâts à ${players[0].name}.`);
+            } else if(aIntent>0) {
+              writeLog(`${players[1].name} bloque les dégâts.`);
+            }
+          }
+        }
+
+        // apply burn application if burn action used and canPerform and not blocked
+        if(aAct==='burn' && aCan && !aBurnBlocked){
+          // immediate 1 damage on application, then 2 ticks at start of next turns
+          players[1].hp -= 1;
+          players[1].burnRemaining = (players[1].burnRemaining || 0) + 2;
+          writeLog(`${players[0].name} applique Brûlure à ${players[1].name} — 1 dmg immédiat, puis 1 dmg au début des 2 prochains tours.`);
+          flashHit(avatar2);
+          showFloating('-1', avatar2);
+        }
+        if(bAct==='burn' && bCan && !bBurnBlocked){
+          players[0].hp -= 1;
+          players[0].burnRemaining = (players[0].burnRemaining || 0) + 2;
+          writeLog(`${players[1].name} applique Brûlure à ${players[0].name} — 1 dmg immédiat, puis 1 dmg au début des 2 prochains tours.`);
+          flashHit(avatar1);
+          showFloating('-1', avatar1);
+        }
+
+        // apply self-damage from Furie (doit toujours se produire si l'action est valide)
+        if(aAct === 'furie' && aCan){
+          players[0].hp -= 3;
+          writeLog(`${players[0].name} subit 3 PV en contrepartie de Furie.`);
+          flashHit(avatar1);
+          showFloating('-3', avatar1);
+        }
+        if(bAct === 'furie' && bCan){
+          players[1].hp -= 3;
+          writeLog(`${players[1].name} subit 3 PV en contrepartie de Furie.`);
+          flashHit(avatar2);
+          showFloating('-3', avatar2);
+        }
+
+        // Handle Vampirisme special logic
+        if(aAct === 'vampirisme' && aCan){
+          if(bAct === 'block' || bAct === 'armure'){
+            players[0].hp += 1;
+            writeLog(`${players[0].name} utilise Vampirisme et récupère 1 PV.`);
+            renderStats();
+          }
+        }
+        if(bAct === 'vampirisme' && bCan){
+          if(aAct === 'block' || aAct === 'armure'){
+            players[1].hp += 1;
+            writeLog(`${players[1].name} utilise Vampirisme et récupère 1 PV.`);
+            renderStats();
+          }
+        }
+
+        // 3) damage phase & visual attack (1.8s -> 3.0s)
+        // add attack animation classes so the action card pulses toward opponent during the remaining time
+        if(aIntent>0 || aReflect>0){ p1Action.classList.add('attack-right'); }
+        if(bIntent>0 || bReflect>0){ p2Action.classList.add('attack-left'); }
+
+        await sleep(250); // short lead-in before applying damage visuals
+
+        // apply damages simultaneously (including reflections)
+        if(aTakes>0){ players[0].hp -= aTakes; flashHit(avatar1); showFloating(`-${aTakes}`, avatar1); }
+        if(bTakes>0){ players[1].hp -= bTakes; flashHit(avatar2); showFloating(`-${bTakes}`, avatar2); }
+        if(aReflect>0){ players[0].hp -= aReflect; flashHit(avatar1); showFloating(`-${aReflect}`, avatar1); }
+        if(bReflect>0){ players[1].hp -= bReflect; flashHit(avatar2); showFloating(`-${bReflect}`, avatar2); }
+
+        renderStats();
+
+        // wait remaining time
+        await sleep(1200);
+
+        // clean up attack animation classes
+        p1Action.classList.remove('attack-right');
+        p2Action.classList.remove('attack-left');
+
+        writeLog(`Après étape ${step+1}: J1 charges=${players[0].charges}, PV=${players[0].hp} | J2 charges=${players[1].charges}, PV=${players[1].hp}`);
+
+        // hide action visuals before next step
+        hideActionVisual(p1Action);
+        hideActionVisual(p2Action);
+
+        await sleep(200);
+
+        // early end if someone <=0
+        if(players[0].hp <=0 || players[1].hp <=0) break;
+      }
+
+      // Apply Tourmente damage if used at step 0
+      if (players[0].selection[0] === 'tourmente' && canPerform(players[0], 'tourmente')) {
+        const damage = calculateTourmenteDamage(players[1].selection);
+        if (damage > 0) {
+          players[1].hp -= damage;
+          writeLog(`${players[0].name} applique Tourmente : ${players[1].name} subit ${damage} PV pour répétitions.`);
+          flashHit(avatar2);
+          showFloating(`-${damage}`, avatar2);
+        }
+      }
+      if (players[1].selection[0] === 'tourmente' && canPerform(players[1], 'tourmente')) {
+        const damage = calculateTourmenteDamage(players[0].selection);
+        if (damage > 0) {
+          players[0].hp -= damage;
+          writeLog(`${players[1].name} applique Tourmente : ${players[0].name} subit ${damage} PV pour répétitions.`);
+          flashHit(avatar1);
+          showFloating(`-${damage}`, avatar1);
+        }
+      }
+      renderStats();
+
+      // clear selections and validated for next round
+      validated = [false,false];
+      players[0].selection = [];
+      players[1].selection = [];
+
+      // check end
+      if(players[0].hp <=0 || players[1].hp<=0){
+        phase = 'ended';
+        const winner = players[0].hp <=0 && players[1].hp <=0 ? 'Egalité' : (players[0].hp<=0? 'J2' : 'J1');
+        writeLog(`Partie terminée — ${winner} gagne.`);
+        gameState.textContent = `Terminé — ${winner} gagne`;
+        updateUI();
+        return;
+      }
+
+      // next round: J1 starts selecting
+      activePlayer = 0;
+      phase = 'select';
+      writeLog('Nouveau tour — J1 choisit.');
+      updateUI();
+    }
+
+    // visual helpers
+    function showActionVisual(el, action){
+      el.className = 'action-card';
+      if(!action){ el.textContent = '—'; return; }
+      el.textContent = '';
+      el.classList.add('show');
+      el.classList.add(action);
+      const label = document.createElement('div'); label.style.fontWeight='800'; label.style.fontSize='18px'; label.textContent = labelFor(action);
+      const sub = document.createElement('div'); sub.style.fontSize='13px'; sub.style.opacity='0.85'; sub.textContent = descFor(action);
+      el.appendChild(label); el.appendChild(sub);
+    }
+    function hideActionVisual(el){ el.className='action-card'; el.textContent='—'; }
+    function showFloating(text, container){
+      const f = document.createElement('div'); f.className='floating-damage'; f.textContent = text; container.appendChild(f);
+      setTimeout(()=>{ try{ container.removeChild(f) }catch(e){} },900);
+    }
+    function flashHit(container){ container.classList.add('flash'); setTimeout(()=>container.classList.remove('flash'),450); }
+
+    // reset button
+    resetBtn.addEventListener('click', ()=>{
+      players[0].hp = MAX_HP; players[1].hp = MAX_HP; players[0].charges = 0; players[1].charges = 0;
+      resetSelections();
+    });
+
+    // autofill: randomize both selections quickly
+    autoFillBtn.addEventListener('click', ()=>{
+      const acts = ['charge','fire','special','block','burn','riposte','furie','armure','courtcircuit','tourmente'];
+      players.forEach((p,idx)=>{
+        p.selection = Array.from({length:3}, ()=>acts[Math.floor(Math.random()*acts.length)]);
+        validated[idx] = true;
+      });
+      phase = 'ready';
+      writeLog('Séquences remplies aléatoirement pour les deux joueurs.');
+      updateUI();
+    });
+
+    // init
+    resetSelections();
+    updateUI();
+
+  </script>
+</body>
+</html>
