@@ -28,10 +28,36 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Import routes
+// Import routes and swagger
 const apiRoutes = require('./routes');
+const { serve, setup } = require('./config/swagger');
+
+// Swagger documentation
+app.use('/api-docs', serve, setup);
 
 // Basic health check endpoint
+/**
+ * @swagger
+ * /health:
+ *   get:
+ *     summary: Health check endpoint
+ *     description: Returns the current status of the server
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: Server is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: OK
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ */
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });

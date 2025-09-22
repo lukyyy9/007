@@ -6,6 +6,69 @@ const router = express.Router();
 
 const gameSettingsService = new GameSettingsService();
 
+/**
+ * @swagger
+ * tags:
+ *   name: Games
+ *   description: Game management and gameplay
+ */
+
+/**
+ * @swagger
+ * /api/game/create:
+ *   post:
+ *     summary: Create a new game
+ *     tags: [Games]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: Game name
+ *                 example: "My Awesome Game"
+ *               gameConfig:
+ *                 type: object
+ *                 description: Game configuration settings
+ *                 properties:
+ *                   gameMode:
+ *                     type: string
+ *                     enum: [standard, blitz, endurance]
+ *                     example: standard
+ *                   maxHealth:
+ *                     type: integer
+ *                     example: 6
+ *                   turnTimeLimit:
+ *                     type: integer
+ *                     example: 20
+ *                   seriesLength:
+ *                     type: integer
+ *                     example: 1
+ *     responses:
+ *       201:
+ *         description: Game created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Game created successfully
+ *                 game:
+ *                   $ref: '#/components/schemas/Game'
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ValidationError'
+ */
 // Create a new game
 router.post('/create', auth.authenticateToken, validation.validateGameCreation, async (req, res) => {
   try {
@@ -58,6 +121,48 @@ router.post('/create', auth.authenticateToken, validation.validateGameCreation, 
   }
 });
 
+/**
+ * @swagger
+ * /api/game/join/{gameId}:
+ *   post:
+ *     summary: Join an existing game
+ *     tags: [Games]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: gameId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Game ID to join
+ *     responses:
+ *       200:
+ *         description: Joined game successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Joined game successfully
+ *                 game:
+ *                   $ref: '#/components/schemas/Game'
+ *       400:
+ *         description: Cannot join game (full, own game, etc.)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Game not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 // Join an existing game
 router.post('/join/:gameId', auth.authenticateToken, validation.validateGameJoin, async (req, res) => {
   try {
@@ -126,6 +231,45 @@ router.post('/join/:gameId', auth.authenticateToken, validation.validateGameJoin
   }
 });
 
+/**
+ * @swagger
+ * /api/game/{gameId}:
+ *   get:
+ *     summary: Get game details
+ *     tags: [Games]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: gameId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Game ID
+ *     responses:
+ *       200:
+ *         description: Game details retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 game:
+ *                   $ref: '#/components/schemas/Game'
+ *       403:
+ *         description: Access denied (not a player in this game)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Game not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 // Get game status
 router.get('/:gameId', auth.authenticateToken, validation.validateUUIDParam('gameId'), async (req, res) => {
   try {
@@ -166,6 +310,55 @@ router.get('/:gameId', auth.authenticateToken, validation.validateUUIDParam('gam
   }
 });
 
+/**
+ * @swagger
+ * /api/game:
+ *   get:
+ *     summary: Get list of available games
+ *     tags: [Games]
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [waiting, active, completed]
+ *           default: waiting
+ *         description: Filter games by status
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *           minimum: 1
+ *           maximum: 100
+ *         description: Number of games to return
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *           minimum: 0
+ *         description: Number of games to skip
+ *     responses:
+ *       200:
+ *         description: Games list retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 games:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Game'
+ *                 total:
+ *                   type: integer
+ *                   description: Total number of games matching criteria
+ *                 limit:
+ *                   type: integer
+ *                 offset:
+ *                   type: integer
+ */
 // Get list of available games
 router.get('/', auth.optionalAuth, async (req, res) => {
   try {
@@ -204,6 +397,55 @@ router.get('/', auth.optionalAuth, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/game/user/my-games:
+ *   get:
+ *     summary: Get current user's games
+ *     tags: [Games]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [waiting, active, completed]
+ *         description: Filter games by status
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *           minimum: 1
+ *           maximum: 100
+ *         description: Number of games to return
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *           minimum: 0
+ *         description: Number of games to skip
+ *     responses:
+ *       200:
+ *         description: User games retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 games:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Game'
+ *                 total:
+ *                   type: integer
+ *                 limit:
+ *                   type: integer
+ *                 offset:
+ *                   type: integer
+ */
 // Get user's games
 router.get('/user/my-games', auth.authenticateToken, async (req, res) => {
   try {
@@ -247,6 +489,72 @@ router.get('/user/my-games', auth.authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/game/config/options:
+ *   get:
+ *     summary: Get game configuration options
+ *     tags: [Games]
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: Configuration options retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 gameModes:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       value:
+ *                         type: string
+ *                       label:
+ *                         type: string
+ *                       description:
+ *                         type: string
+ *                 seriesOptions:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       value:
+ *                         type: integer
+ *                       label:
+ *                         type: string
+ *                       description:
+ *                         type: string
+ *                 timerOptions:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       value:
+ *                         type: integer
+ *                       label:
+ *                         type: string
+ *                       description:
+ *                         type: string
+ *                 healthOptions:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       value:
+ *                         type: integer
+ *                       label:
+ *                         type: string
+ *                       description:
+ *                         type: string
+ *                 defaults:
+ *                   type: object
+ *                   description: Default game settings
+ *                 validationRules:
+ *                   type: object
+ *                   description: Validation rules for game configuration
+ */
 // Get game configuration options and defaults
 router.get('/config/options', async (req, res) => {
   try {
