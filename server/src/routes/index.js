@@ -1,16 +1,16 @@
-// Routes index file - will be populated in task 4.1
+// Routes index file
 const express = require('express');
 const router = express.Router();
 
-// Import route modules here when they are created
-// const authRoutes = require('./auth');
-// const gameRoutes = require('./game');
-// const tournamentRoutes = require('./tournament');
+// Import route modules
+const authRoutes = require('./auth');
+const gameRoutes = require('./game');
+const tournamentRoutes = require('./tournament');
 
-// Use route modules here when they are created
-// router.use('/auth', authRoutes);
-// router.use('/game', gameRoutes);
-// router.use('/tournament', tournamentRoutes);
+// Use route modules
+router.use('/auth', authRoutes);
+router.use('/game', gameRoutes);
+router.use('/tournament', tournamentRoutes);
 
 // Basic API info endpoint
 router.get('/', (req, res) => {
@@ -19,7 +19,9 @@ router.get('/', (req, res) => {
     version: '1.0.0',
     endpoints: {
       health: '/health',
-      api: '/api'
+      auth: '/api/auth',
+      game: '/api/game',
+      tournament: '/api/tournament'
     }
   });
 });

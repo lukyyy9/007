@@ -39,15 +39,24 @@
     - Write comprehensive unit tests for game logic
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [ ] 4. Build server API and WebSocket handlers
-  - [ ] 4.1 Create Express API endpoints
+- [x] 4. Build server API and WebSocket handlers
+
+
+
+
+
+  - [x] 4.1 Create Express API endpoints
+
+
     - Implement user authentication endpoints (register, login)
     - Create game management endpoints (create, join, get status)
     - Add tournament management endpoints (create, join, get brackets)
     - Implement JWT middleware for protected routes
     - _Requirements: 5.1, 5.2, 5.3, 8.1, 8.2, 8.3_
   
-  - [ ] 4.2 Implement Socket.IO event handlers
+  - [x] 4.2 Implement Socket.IO event handlers
+
+
     - Create real-time game event handlers (join, select cards, state updates)
     - Implement tournament event handlers (join, bracket updates, match start)
     - Add connection management and error handling

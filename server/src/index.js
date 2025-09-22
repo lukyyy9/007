@@ -40,13 +40,8 @@ app.get('/health', (req, res) => {
 app.use('/api', apiRoutes);
 
 // Socket.IO connection handling
-io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
-  
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
-  });
-});
+const SocketHandler = require('./socket');
+const socketHandler = new SocketHandler(io);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {

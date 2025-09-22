@@ -1,0 +1,256 @@
+const GameHandlers = require('../socket/gameHandlers');
+const TournamentHandlers = require('../socket/tournamentHandlers');
+const SocketHandler = require('../socket');
+
+// Mock Socket.IO
+const mockSocket = {
+    id: 'test-socket-id',
+    on: jest.fn(),
+    emit: jest.fn(),
+    join: jest.fn(),
+    leave: jest.fn(),
+    authenticated: true,
+    userId: 'test-user-id'
+};
+
+const mockIo = {
+    on: jest.fn(),
+    emit: jest.fn(),
+    sockets: {
+        sockets: new Map([['test-socket-id', mockSocket]])
+    },
+    use: jest.fn(),
+    close: jest.fn()
+};
+
+// Mock database models
+jest.mock('../models', () => ({
+    Game: {
+        findByPk: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        findAndCountAll: jest.fn()
+    },
+    User: {
+        findByPk: jest.fn()
+    },
+    Tournament: {
+        findByPk: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn()
+    },
+    TournamentPlayer: {
+        findOne: jest.fn(),
+        create: jest.fn(),
+        destroy: jest.fn()
+    },
+    Match: {
+        findAll: jest.fn(),
+        findByPk: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn()
+    },
+    GameAction: {
+        create: jest.fn()
+    }
+}));
+
+describe('Socket Handlers', () => {
+    describe('GameHandlers', () => {
+        let gameHandlers;
+
+        beforeEach(() => {
+            gameHandlers = new GameHandlers(mockIo);
+            jest.clearAllMocks();
+        });
+
+        test('should initialize correctly', () => {
+            expect(gameHandlers.io).toBe(mockIo);
+            expect(gameHandlers.connectedUsers).toBeInstanceOf(Map);
+            expect(gameHandlers.userSockets).toBeInstanceOf(Map);
+            expect(gameHandlers.gameRooms).toBeInstanceOf(Map);
+        });
+
+        test('should register event handlers', () => {
+            gameHandlers.registerHandlers(mockSocket);
+
+            expect(mockSocket.on).toHaveBeenCalledWith('user:authenticate', expect.any(Function));
+            expect(mockSocket.on).toHaveBeenCalledWith('disconnect', expect.any(Function));
+            expect(mockSocket.on).toHaveBeenCalledWith('game:join', expect.any(Function));
+            expect(mockSocket.on).toHaveBeenCalledWith('game:leave', expect.any(Function));
+            expect(mockSocket.on).toHaveBeenCalledWith('game:select-cards', expect.any(Function));
+        });
+
+        test('should handle user authentication', async () => {
+            gameHandlers.registerHandlers(mockSocket);
+
+            const authData = { userId: 'test-user', token: 'test-token' };
+
+            // Get the authenticate handler
+            const authenticateHandler = mockSocket.on.mock.calls.find(
+                call => call[0] === 'user:authenticate'
+            )[1];
+
+            await authenticateHandler(authData);
+
+            expect(gameHandlers.connectedUsers.get(mockSocket.id)).toBe('test-user');
+            expect(mockSocket.emit).toHaveBeenCalledWith('auth:success', { userId: 'test-user' });
+        });
+
+        test('should handle disconnect', () => {
+            gameHandlers.connectedUsers.set(mockSocket.id, 'test-user');
+            gameHandlers.userSockets.set('test-user', new Set([mockSocket.id]));
+
+            gameHandlers.handleDisconnect(mockSocket);
+
+            expect(gameHandlers.connectedUsers.has(mockSocket.id)).toBe(false);
+            expect(gameHandlers.userSockets.has('test-user')).toBe(false);
+        });
+
+        test('should broadcast to game', () => {
+            const gameId = 'test-game-id';
+            const socketSet = new Set([mockSocket.id]);
+            gameHandlers.gameRooms.set(gameId, socketSet);
+
+            gameHandlers.broadcastToGame(gameId, 'test:event', { data: 'test' });
+
+            expect(mockSocket.emit).toHaveBeenCalledWith('test:event', { data: 'test' });
+        });
+    });
+
+    describe('TournamentHandlers', () => {
+        let tournamentHandlers;
+
+        beforeEach(() => {
+            tournamentHandlers = new TournamentHandlers(mockIo);
+            jest.clearAllMocks();
+        });
+
+        test('should initialize correctly', () => {
+            expect(tournamentHandlers.io).toBe(mockIo);
+            expect(tournamentHandlers.tournamentRooms).toBeInstanceOf(Map);
+        });
+
+        test('should register event handlers', () => {
+            const connectedUsers = new Map();
+            tournamentHandlers.registerHandlers(mockSocket, connectedUsers);
+
+            expect(mockSocket.on).toHaveBeenCalledWith('tournament:join', expect.any(Function));
+            expect(mockSocket.on).toHaveBeenCalledWith('tournament:leave', expect.any(Function));
+            expect(mockSocket.on).toHaveBeenCalledWith('tournament:get-brackets', expect.any(Function));
+            expect(mockSocket.on).toHaveBeenCalledWith('tournament:start', expect.any(Function));
+        });
+
+        test('should format tournament data correctly', () => {
+            const mockTournament = {
+                id: 'tournament-id',
+                name: 'Test Tournament',
+                format: 'single-elimination',
+                maxPlayers: 8,
+                status: 'waiting',
+                currentRound: 0,
+                gameConfig: { maxHealth: 6 },
+                creator: { id: 'creator-id', username: 'creator' },
+                winner: null,
+                TournamentPlayers: [
+                    { player: { id: 'player1', username: 'player1' }, status: 'active', joinedAt: new Date() }
+                ],
+                createdAt: new Date(),
+                startedAt: null,
+                completedAt: null
+            };
+
+            const formatted = tournamentHandlers.formatTournamentData(mockTournament);
+
+            expect(formatted.id).toBe('tournament-id');
+            expect(formatted.name).toBe('Test Tournament');
+            expect(formatted.players).toHaveLength(1);
+            expect(formatted.players[0].username).toBe('player1');
+        });
+
+        test('should format brackets correctly', () => {
+            const mockMatches = [
+                {
+                    id: 'match1',
+                    round: 1,
+                    position: 1,
+                    bracketType: 'winner',
+                    status: 'pending',
+                    player1: { id: 'p1', username: 'player1' },
+                    player2: { id: 'p2', username: 'player2' },
+                    winner: null
+                }
+            ];
+
+            const brackets = tournamentHandlers.formatBrackets(mockMatches, 'single-elimination');
+
+            expect(brackets.winner[1]).toHaveLength(1);
+            expect(brackets.winner[1][0].id).toBe('match1');
+            expect(brackets.loser).toBe(null);
+        });
+
+        test('should broadcast to tournament', () => {
+            const tournamentId = 'test-tournament-id';
+            const socketSet = new Set([mockSocket.id]);
+            tournamentHandlers.tournamentRooms.set(tournamentId, socketSet);
+
+            tournamentHandlers.broadcastToTournament(tournamentId, 'test:event', { data: 'test' });
+
+            expect(mockSocket.emit).toHaveBeenCalledWith('test:event', { data: 'test' });
+        });
+    });
+
+    describe('SocketHandler', () => {
+        let socketHandler;
+
+        beforeEach(() => {
+            jest.clearAllMocks();
+            socketHandler = new SocketHandler(mockIo);
+        });
+
+        test('should initialize correctly', () => {
+            expect(socketHandler.io).toBe(mockIo);
+            expect(socketHandler.gameHandlers).toBeDefined();
+            expect(socketHandler.tournamentHandlers).toBeDefined();
+            expect(socketHandler.connectedUsers).toBeInstanceOf(Map);
+        });
+
+        test('should setup socket authentication middleware', () => {
+            // The constructor should have called io.use
+            expect(mockIo.use).toHaveBeenCalled();
+        });
+
+        test('should setup connection handling', () => {
+            // The constructor should have called io.on with 'connection'
+            expect(mockIo.on).toHaveBeenCalled();
+        });
+
+        test('should get connection stats', () => {
+            socketHandler.connectedUsers.set('socket1', 'user1');
+            socketHandler.connectedUsers.set('socket2', 'user2');
+
+            const stats = socketHandler.getStats();
+
+            expect(stats.authenticatedUsers).toBe(2);
+            expect(stats.totalConnections).toBeDefined();
+        });
+
+        test('should broadcast announcement', () => {
+            socketHandler.broadcastAnnouncement('Test message', 'info');
+
+            expect(mockIo.emit).toHaveBeenCalledWith('server:announcement', {
+                message: 'Test message',
+                type: 'info',
+                timestamp: expect.any(String)
+            });
+        });
+
+        test('should send message to specific user', () => {
+            socketHandler.connectedUsers.set(mockSocket.id, 'test-user');
+
+            socketHandler.sendToUser('test-user', 'test:event', { data: 'test' });
+
+            expect(mockSocket.emit).toHaveBeenCalledWith('test:event', { data: 'test' });
+        });
+    });
+});
