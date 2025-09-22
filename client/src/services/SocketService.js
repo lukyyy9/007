@@ -10,7 +10,7 @@ class SocketService {
     this.listeners = new Map();
   }
 
-  connect(serverUrl = 'http://localhost:3001', token = null) {
+  connect(serverUrl = process.env.EXPO_PUBLIC_SOCKET_URL || 'http://192.168.1.30:3000', token = null) {
     if (this.socket && this.isConnected) {
       console.log('Socket already connected');
       return Promise.resolve();
@@ -43,7 +43,7 @@ class SocketService {
         this.socket.on('connect_error', (error) => {
           console.error('Socket connection error:', error);
           this.isConnected = false;
-          
+
           if (this.reconnectAttempts === 0) {
             reject(error);
           }
@@ -53,13 +53,13 @@ class SocketService {
         this.socket.on('disconnect', (reason) => {
           console.log('Socket disconnected:', reason);
           this.isConnected = false;
-          
+
           // Attempt reconnection for certain disconnect reasons
           if (reason === 'io server disconnect') {
             // Server initiated disconnect, don't reconnect
             return;
           }
-          
+
           this.attemptReconnection();
         });
 
@@ -121,7 +121,7 @@ class SocketService {
     }
 
     this.socket.on(event, callback);
-    
+
     // Store listener for cleanup
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
@@ -133,7 +133,7 @@ class SocketService {
     if (!this.socket) return;
 
     this.socket.off(event, callback);
-    
+
     // Remove from stored listeners
     if (this.listeners.has(event)) {
       const callbacks = this.listeners.get(event);
@@ -221,7 +221,7 @@ class SocketService {
       });
     });
     this.listeners.clear();
-    
+
     this.disconnect();
   }
 }

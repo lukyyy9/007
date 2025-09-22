@@ -11,8 +11,14 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:19006",
-    methods: ["GET", "POST"]
+    origin: [
+      process.env.CLIENT_URL || "http://localhost:19006",
+      process.env.SOCKET_CORS_ORIGIN || "http://localhost:19006",
+      "http://192.168.1.30:19006", // Allow Expo dev server
+      /^http:\/\/192\.168\.\d+\.\d+:19006$/, // Allow any local network Expo dev server
+    ],
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
@@ -70,8 +76,9 @@ const SocketHandler = require('./socket');
 const socketHandler = new SocketHandler(io);
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+const HOST = process.env.HOST || '0.0.0.0'; // Bind to all interfaces
+server.listen(PORT, HOST, () => {
+  console.log(`Server running on ${HOST}:${PORT}`);
 });
 
 module.exports = { app, server, io };

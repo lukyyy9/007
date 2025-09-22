@@ -70,7 +70,8 @@ export const SocketProvider = ({ children }) => {
     dispatch({ type: 'SET_CONNECTION_STATUS', payload: 'connecting' });
     
     try {
-      await SocketService.connect('http://localhost:3001', token);
+      const socketUrl = process.env.EXPO_PUBLIC_SOCKET_URL || 'http://192.168.1.30:3000';
+      await SocketService.connect(socketUrl, token);
       dispatch({ type: 'SET_CONNECTION_STATUS', payload: 'connected' });
       dispatch({ type: 'SET_LAST_CONNECTED', payload: new Date().toISOString() });
       dispatch({ type: 'SET_ERROR', payload: null });
