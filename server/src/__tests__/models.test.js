@@ -13,34 +13,38 @@ describe('Database Models', () => {
   });
 
   describe('User Model', () => {
-    test('should create a user with hashed password', async () => {
+    let testUser;
+
+    beforeAll(async () => {
+      // Clean up and create test user for this suite
+      await db.sequelize.truncate({ cascade: true, restartIdentity: true });
+      
       const userData = {
         username: 'testuser',
         email: 'test@example.com',
         password: 'password123'
       };
 
-      const user = await User.create(userData);
-      
-      expect(user.username).toBe('testuser');
-      expect(user.email).toBe('test@example.com');
-      expect(user.password).not.toBe('password123'); // Should be hashed
-      expect(user.isActive).toBe(true);
+      testUser = await User.create(userData);
+    });
+
+    test('should create a user with hashed password', async () => {
+      expect(testUser.username).toBe('testuser');
+      expect(testUser.email).toBe('test@example.com');
+      expect(testUser.password).not.toBe('password123'); // Should be hashed
+      expect(testUser.isActive).toBe(true);
     });
 
     test('should validate password correctly', async () => {
-      const user = await User.findOne({ where: { username: 'testuser' } });
-      
-      const isValid = await user.validatePassword('password123');
+      const isValid = await testUser.validatePassword('password123');
       expect(isValid).toBe(true);
       
-      const isInvalid = await user.validatePassword('wrongpassword');
+      const isInvalid = await testUser.validatePassword('wrongpassword');
       expect(isInvalid).toBe(false);
     });
 
     test('should not include password in JSON output', async () => {
-      const user = await User.findOne({ where: { username: 'testuser' } });
-      const userJSON = user.toJSON();
+      const userJSON = testUser.toJSON();
       
       expect(userJSON.password).toBeUndefined();
       expect(userJSON.username).toBe('testuser');
@@ -48,6 +52,11 @@ describe('Database Models', () => {
   });
 
   describe('CardDefinition Model', () => {
+    beforeAll(async () => {
+      // Clean up for this suite
+      await db.sequelize.truncate({ cascade: true, restartIdentity: true });
+    });
+
     test('should create card definitions', async () => {
       const cardData = {
         id: 'test-card',
@@ -75,7 +84,11 @@ describe('Database Models', () => {
   describe('Game Model', () => {
     let user1, user2;
 
-    beforeEach(async () => {
+    beforeAll(async () => {
+      // Clean up for this suite
+      await db.sequelize.truncate({ cascade: true, restartIdentity: true });
+      
+      // Create users once for this suite
       user1 = await User.create({
         username: 'player1',
         email: 'player1@example.com',
@@ -87,6 +100,11 @@ describe('Database Models', () => {
         email: 'player2@example.com',
         password: 'password123'
       });
+    });
+
+    beforeEach(async () => {
+      // Clean up games between tests, but keep users
+      await Game.destroy({ where: {} });
     });
 
     test('should create a game with default values', async () => {
@@ -125,12 +143,21 @@ describe('Database Models', () => {
   describe('Tournament Model', () => {
     let creator;
 
-    beforeEach(async () => {
+    beforeAll(async () => {
+      // Clean up for this suite
+      await db.sequelize.truncate({ cascade: true, restartIdentity: true });
+      
+      // Create creator once for this suite
       creator = await User.create({
         username: 'tournament_creator',
         email: 'creator@example.com',
         password: 'password123'
       });
+    });
+
+    beforeEach(async () => {
+      // Clean up tournaments between tests, but keep users
+      await Tournament.destroy({ where: {} });
     });
 
     test('should create a tournament with default values', async () => {
@@ -150,21 +177,31 @@ describe('Database Models', () => {
   });
 
   describe('GameAction Model', () => {
-    let user, game;
+    let user, user2, game;
 
-    beforeEach(async () => {
+    beforeAll(async () => {
+      // Clean up for this suite
+      await db.sequelize.truncate({ cascade: true, restartIdentity: true });
+      
+      // Create users once for this suite
       user = await User.create({
         username: 'action_player',
         email: 'action@example.com',
         password: 'password123'
       });
 
-      const user2 = await User.create({
+      user2 = await User.create({
         username: 'action_player2',
         email: 'action2@example.com',
         password: 'password123'
       });
+    });
 
+    beforeEach(async () => {
+      // Clean up games and actions between tests, but keep users
+      await GameAction.destroy({ where: {} });
+      await Game.destroy({ where: {} });
+      
       game = await Game.create({
         player1Id: user.id,
         player2Id: user2.id
