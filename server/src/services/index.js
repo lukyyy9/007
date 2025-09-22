@@ -1,10 +1,12 @@
-// Services index file - will be populated in later tasks
-// const GameEngine = require('./GameEngine');
+// Services index file
+const GameEngine = require('./GameEngine');
+const CardEffectsSystem = require('./CardEffectsSystem');
 // const TournamentManager = require('./TournamentManager');
 // const SocketHandler = require('./SocketHandler');
 
 module.exports = {
-  // GameEngine,
+  GameEngine,
+  CardEffectsSystem,
   // TournamentManager,
   // SocketHandler
 };

@@ -23,14 +23,16 @@
     - Create seed data for card definitions
     - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-- [ ] 3. Create card system and game logic
-  - [ ] 3.1 Implement card definitions and effects system
-    - Create card data structure with all 12 card types and their effects
-    - Implement card effect validation and application logic
-    - Write unit tests for each card type and their interactions
-    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 2.11, 2.12_
+- [x] 3. Create card system and game logic
+
+
+  - Create card data structure with all 12 card types and their effects
+  - Implement card effect validation and application logic
+  - Write unit tests for each card type and their interactions
+  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 2.11, 2.12_
   
-  - [ ] 3.2 Implement core game engine
+  - [x] 3.2 Implement core game engine
+
     - Create GameEngine class with turn resolution logic
     - Implement player state management (health, charges, status effects)
     - Add game phase management (selection, resolution, ended)
