@@ -13,6 +13,9 @@ export { default as AnimationEngine } from './AnimationEngine';
 export { default as CardEffectAnimation } from './CardEffectAnimation';
 export { default as TurnTransition } from './TurnTransition';
 export { default as WinLoseScreen } from './WinLoseScreen';
+export { default as GameConfigModal } from './GameConfigModal';
+export { default as SeriesProgressDisplay } from './SeriesProgressDisplay';
+export { default as SeriesTransition } from './SeriesTransition';
 
 // Tournament components
 export { default as TournamentCreationModal } from './TournamentCreationModal';

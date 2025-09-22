@@ -402,7 +402,10 @@ class GameEngine {
     
     // Update series score if it's a best-of series
     if (game.gameConfig.bestOfSeries > 1 && result.winner) {
-      if (result.winner.id === game.players[0].id) {
+      const gameWinner = result.winner.id === game.players[0].id ? 'player1' : 'player2';
+      
+      // Update series score
+      if (gameWinner === 'player1') {
         game.seriesScore.player1++;
       } else {
         game.seriesScore.player2++;
@@ -410,9 +413,30 @@ class GameEngine {
 
       // Check if series is complete
       const winsNeeded = Math.ceil(game.gameConfig.bestOfSeries / 2);
-      if (game.seriesScore.player1 >= winsNeeded || game.seriesScore.player2 >= winsNeeded) {
+      const seriesComplete = game.seriesScore.player1 >= winsNeeded || game.seriesScore.player2 >= winsNeeded;
+      
+      if (seriesComplete) {
         game.seriesComplete = true;
+        game.seriesWinner = game.seriesScore.player1 >= winsNeeded ? game.players[0] : game.players[1];
+        
+        this.addToHistory(game, {
+          type: 'series_ended',
+          seriesWinner: game.seriesWinner.id,
+          finalScore: game.seriesScore,
+          totalGames: game.seriesScore.player1 + game.seriesScore.player2,
+          timestamp: new Date()
+        });
       } else {
+        // Prepare for next game in series
+        this.addToHistory(game, {
+          type: 'game_ended_in_series',
+          gameWinner: result.winner?.id || null,
+          reason: result.reason,
+          currentScore: game.seriesScore,
+          nextGameNumber: game.seriesScore.player1 + game.seriesScore.player2 + 1,
+          timestamp: new Date()
+        });
+        
         // Start next game in series
         this.startNextGameInSeries(game);
         return;
@@ -442,7 +466,9 @@ class GameEngine {
       player.ready = false;
     }
 
-    game.gameConfig.currentGame++;
+    // Update game state for next game
+    const nextGameNumber = game.seriesScore.player1 + game.seriesScore.player2 + 1;
+    game.gameConfig.currentGame = nextGameNumber;
     game.currentTurn = 1;
     game.phase = 'selection';
     game.turnTimer = Date.now() + (game.gameConfig.turnTimeLimit * 1000);
@@ -450,7 +476,9 @@ class GameEngine {
 
     this.addToHistory(game, {
       type: 'next_game_started',
-      gameNumber: game.gameConfig.currentGame,
+      gameNumber: nextGameNumber,
+      seriesScore: { ...game.seriesScore },
+      winsNeeded: Math.ceil(game.gameConfig.bestOfSeries / 2),
       timestamp: new Date()
     });
   }
@@ -483,6 +511,8 @@ class GameEngine {
       throw new Error('Game not found');
     }
 
+    const seriesStatus = this.getSeriesStatus(game);
+
     return {
       id: game.id,
       phase: game.phase,
@@ -498,7 +528,50 @@ class GameEngine {
       })),
       gameConfig: game.gameConfig,
       seriesScore: game.seriesScore,
-      winner: game.winner
+      seriesStatus: seriesStatus,
+      winner: game.winner,
+      seriesWinner: game.seriesWinner || null,
+      seriesComplete: game.seriesComplete || false
+    };
+  }
+
+  /**
+   * Gets series status information
+   * @param {Object} game - Game object
+   * @returns {Object} - Series status
+   */
+  getSeriesStatus(game) {
+    const { bestOfSeries } = game.gameConfig;
+    const { player1, player2 } = game.seriesScore;
+    const winsNeeded = Math.ceil(bestOfSeries / 2);
+    const totalGamesPlayed = player1 + player2;
+    const currentGameNumber = totalGamesPlayed + 1;
+    
+    const isComplete = player1 >= winsNeeded || player2 >= winsNeeded;
+    const winner = player1 >= winsNeeded ? 'player1' : 
+                   player2 >= winsNeeded ? 'player2' : null;
+
+    let summary;
+    if (bestOfSeries === 1) {
+      summary = 'Single Game';
+    } else if (isComplete) {
+      const winnerName = winner === 'player1' ? 'Player 1' : 'Player 2';
+      summary = `Series Complete - ${winnerName} wins ${player1}-${player2}`;
+    } else {
+      summary = `Best of ${bestOfSeries} - Game ${currentGameNumber} (${player1}-${player2})`;
+    }
+
+    return {
+      bestOfSeries,
+      winsNeeded,
+      player1Wins: player1,
+      player2Wins: player2,
+      totalGamesPlayed,
+      currentGameNumber,
+      isComplete,
+      winner,
+      summary,
+      gamesRemaining: Math.max(0, bestOfSeries - totalGamesPlayed)
     };
   }
 

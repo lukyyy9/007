@@ -1,20 +1,21 @@
 const express = require('express');
 const { Game, User, GameAction } = require('../models');
 const { auth, validation } = require('../middleware');
+const { GameSettingsService } = require('../services');
 const router = express.Router();
+
+const gameSettingsService = new GameSettingsService();
 
 // Create a new game
 router.post('/create', auth.authenticateToken, validation.validateGameCreation, async (req, res) => {
   try {
-    const { gameConfig = {} } = req.body;
+    const { gameConfig = {}, name } = req.body;
     
-    const defaultConfig = {
-      maxHealth: 6,
-      turnTimeLimit: 20,
-      bestOfSeries: 1
-    };
-
-    const finalConfig = { ...defaultConfig, ...gameConfig };
+    // Create and validate game configuration using the service
+    const finalConfig = gameSettingsService.createGameConfiguration(
+      gameConfig, 
+      name || `${req.user.username}'s Game`
+    );
 
     const game = await Game.create({
       player1Id: req.user.id,
@@ -30,7 +31,10 @@ router.post('/create', auth.authenticateToken, validation.validateGameCreation, 
       player1StatusEffects: [],
       player2StatusEffects: [],
       turnTimer: finalConfig.turnTimeLimit,
-      gameHistory: []
+      gameHistory: [],
+      name: finalConfig.name,
+      seriesScore: { player1: 0, player2: 0 },
+      currentGameInSeries: 1
     });
 
     // Include player information
@@ -239,6 +243,73 @@ router.get('/user/my-games', auth.authenticateToken, async (req, res) => {
     res.status(500).json({
       error: 'Failed to get user games',
       code: 'GET_USER_GAMES_ERROR'
+    });
+  }
+});
+
+// Get game configuration options and defaults
+router.get('/config/options', async (req, res) => {
+  try {
+    const options = {
+      gameModes: [
+        { value: 'standard', label: 'Standard', description: 'Classic tactical card game experience' },
+        { value: 'blitz', label: 'Blitz', description: 'Fast-paced gameplay with reduced turn timers' },
+        { value: 'endurance', label: 'Endurance', description: 'Extended matches with increased starting health' }
+      ],
+      seriesOptions: [
+        { value: 1, label: 'Quick Match', description: 'Single game, winner takes all' },
+        { value: 3, label: 'Best of 3', description: 'First to win 2 games' },
+        { value: 5, label: 'Best of 5', description: 'First to win 3 games' },
+        { value: 7, label: 'Best of 7', description: 'First to win 4 games' }
+      ],
+      timerOptions: [
+        { value: 10, label: '10 seconds', description: 'Lightning fast' },
+        { value: 15, label: '15 seconds', description: 'Quick decisions' },
+        { value: 20, label: '20 seconds', description: 'Standard pace' },
+        { value: 30, label: '30 seconds', description: 'Thoughtful play' },
+        { value: 45, label: '45 seconds', description: 'Relaxed timing' },
+        { value: 60, label: '60 seconds', description: 'Maximum thinking time' }
+      ],
+      healthOptions: [
+        { value: 3, label: '3 Health', description: 'Quick matches' },
+        { value: 6, label: '6 Health', description: 'Standard game' },
+        { value: 10, label: '10 Health', description: 'Extended matches' },
+        { value: 15, label: '15 Health', description: 'Long strategic games' }
+      ],
+      defaults: gameSettingsService.defaultSettings,
+      validationRules: gameSettingsService.validationRules
+    };
+
+    res.json(options);
+  } catch (error) {
+    console.error('Get config options error:', error);
+    res.status(500).json({
+      error: 'Failed to get configuration options',
+      code: 'GET_CONFIG_OPTIONS_ERROR'
+    });
+  }
+});
+
+// Validate game configuration
+router.post('/config/validate', async (req, res) => {
+  try {
+    const { gameConfig } = req.body;
+    
+    const validation = gameSettingsService.validateGameConfig(gameConfig);
+    const displayInfo = validation.isValid ? 
+      gameSettingsService.getConfigDisplayInfo(validation.config) : null;
+
+    res.json({
+      isValid: validation.isValid,
+      errors: validation.errors,
+      config: validation.config,
+      displayInfo
+    });
+  } catch (error) {
+    console.error('Config validation error:', error);
+    res.status(500).json({
+      error: 'Failed to validate configuration',
+      code: 'CONFIG_VALIDATION_ERROR'
     });
   }
 });

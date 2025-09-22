@@ -10,6 +10,7 @@ import {
 import { useGame } from '../context/GameContext';
 import { useSocket } from '../context/SocketContext';
 import ConnectionStatus from '../components/ConnectionStatus';
+import SeriesProgressDisplay from '../components/SeriesProgressDisplay';
 
 const GameRoomScreen = ({ navigation }) => {
   const [players, setPlayers] = useState([]);
@@ -35,6 +36,7 @@ const GameRoomScreen = ({ navigation }) => {
       bestOfSeries: gameConfig.bestOfSeries,
       turnTimeLimit: gameConfig.turnTimeLimit,
       maxHealth: gameConfig.maxHealth,
+      gameMode: gameConfig.gameMode || 'standard',
     });
   }, [currentGame, gameConfig, navigation]);
 
@@ -95,16 +97,45 @@ const GameRoomScreen = ({ navigation }) => {
       'Game Settings',
       'Choose series length:',
       [
-        { text: 'Quick Match (1 game)', onPress: () => updateSettings(1) },
-        { text: 'Best of 3', onPress: () => updateSettings(3) },
-        { text: 'Best of 5', onPress: () => updateSettings(5) },
+        { text: 'Quick Match (1 game)', onPress: () => updateSettings({ bestOfSeries: 1 }) },
+        { text: 'Best of 3', onPress: () => updateSettings({ bestOfSeries: 3 }) },
+        { text: 'Best of 5', onPress: () => updateSettings({ bestOfSeries: 5 }) },
+        { text: 'Best of 7', onPress: () => updateSettings({ bestOfSeries: 7 }) },
         { text: 'Cancel', style: 'cancel' },
       ]
     );
   };
 
-  const updateSettings = (bestOfSeries) => {
-    setGameSettings(prev => ({ ...prev, bestOfSeries }));
+  const handleChangeTimer = () => {
+    Alert.alert(
+      'Turn Timer',
+      'Choose turn duration:',
+      [
+        { text: '10 seconds', onPress: () => updateSettings({ turnTimeLimit: 10 }) },
+        { text: '15 seconds', onPress: () => updateSettings({ turnTimeLimit: 15 }) },
+        { text: '20 seconds', onPress: () => updateSettings({ turnTimeLimit: 20 }) },
+        { text: '30 seconds', onPress: () => updateSettings({ turnTimeLimit: 30 }) },
+        { text: '45 seconds', onPress: () => updateSettings({ turnTimeLimit: 45 }) },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  const handleChangeGameMode = () => {
+    Alert.alert(
+      'Game Mode',
+      'Choose game mode:',
+      [
+        { text: 'Standard', onPress: () => updateSettings({ gameMode: 'standard' }) },
+        { text: 'Blitz (faster)', onPress: () => updateSettings({ gameMode: 'blitz' }) },
+        { text: 'Endurance (more health)', onPress: () => updateSettings({ gameMode: 'endurance' }) },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  const updateSettings = (newSettings) => {
+    setGameSettings(prev => ({ ...prev, ...newSettings }));
     // TODO: Send settings update to server in task 6.2
   };
 
@@ -127,6 +158,14 @@ const GameRoomScreen = ({ navigation }) => {
           <Text style={styles.sectionTitle}>Game Settings</Text>
           <View style={styles.settingsCard}>
             <View style={styles.settingRow}>
+              <Text style={styles.settingLabel}>Game Mode:</Text>
+              <Text style={styles.settingValue}>
+                {gameSettings.gameMode === 'standard' ? 'Standard' :
+                 gameSettings.gameMode === 'blitz' ? 'Blitz' :
+                 gameSettings.gameMode === 'endurance' ? 'Endurance' : 'Standard'}
+              </Text>
+            </View>
+            <View style={styles.settingRow}>
               <Text style={styles.settingLabel}>Series:</Text>
               <Text style={styles.settingValue}>
                 {gameSettings.bestOfSeries === 1 
@@ -143,15 +182,46 @@ const GameRoomScreen = ({ navigation }) => {
               <Text style={styles.settingValue}>{gameSettings.maxHealth} ❤️</Text>
             </View>
             {isHost && (
-              <TouchableOpacity 
-                style={styles.changeSettingsButton}
-                onPress={handleChangeSettings}
-              >
-                <Text style={styles.changeSettingsText}>Change Settings</Text>
-              </TouchableOpacity>
+              <View style={styles.settingsButtons}>
+                <TouchableOpacity 
+                  style={styles.settingButton}
+                  onPress={handleChangeGameMode}
+                >
+                  <Text style={styles.settingButtonText}>Mode</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.settingButton}
+                  onPress={handleChangeSettings}
+                >
+                  <Text style={styles.settingButtonText}>Series</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.settingButton}
+                  onPress={handleChangeTimer}
+                >
+                  <Text style={styles.settingButtonText}>Timer</Text>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
         </View>
+
+        {/* Series Progress Display */}
+        {gameSettings.bestOfSeries > 1 && (
+          <SeriesProgressDisplay 
+            seriesStatus={{
+              bestOfSeries: gameSettings.bestOfSeries,
+              winsNeeded: Math.ceil(gameSettings.bestOfSeries / 2),
+              player1Wins: 0,
+              player2Wins: 0,
+              currentGameNumber: 1,
+              isComplete: false,
+              winner: null,
+              summary: `Best of ${gameSettings.bestOfSeries} - Game 1 (0-0)`
+            }}
+            playerNames={players.map(p => p.username)}
+          />
+        )}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Players ({players.length}/2)</Text>
@@ -292,16 +362,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#007AFF',
   },
-  changeSettingsButton: {
-    marginTop: 10,
-    paddingVertical: 10,
+  settingsButtons: {
+    flexDirection: 'row',
+    marginTop: 15,
+    gap: 10,
+  },
+  settingButton: {
+    flex: 1,
+    paddingVertical: 8,
     alignItems: 'center',
     backgroundColor: '#f8f9fa',
     borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#007AFF',
   },
-  changeSettingsText: {
+  settingButtonText: {
     color: '#007AFF',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '500',
   },
   playerCard: {

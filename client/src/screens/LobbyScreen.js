@@ -13,10 +13,12 @@ import { useGame } from '../context/GameContext';
 import { useTournament } from '../context/TournamentContext';
 import { useSocket } from '../context/SocketContext';
 import ConnectionStatus from '../components/ConnectionStatus';
+import GameConfigModal from '../components/GameConfigModal';
 
 const LobbyScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [availableGames, setAvailableGames] = useState([]);
+  const [showConfigModal, setShowConfigModal] = useState(false);
   const { user, logout } = useAuth();
   const { joinGame } = useGame();
   const { tournaments, updateTournaments } = useTournament();
@@ -53,40 +55,29 @@ const LobbyScreen = ({ navigation }) => {
   };
 
   const handleCreateGame = () => {
-    Alert.alert(
-      'Create Game',
-      'Choose game type:',
-      [
-        { text: 'Quick Match (1 game)', onPress: () => createGame('quick') },
-        { text: 'Best of 3', onPress: () => createGame('bo3') },
-        { text: 'Best of 5', onPress: () => createGame('bo5') },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
+    setShowConfigModal(true);
   };
 
-  const createGame = async (type) => {
+  const createGame = async (gameConfig) => {
     if (!isConnected) {
       Alert.alert('Connection Error', 'Please check your connection and try again.');
       return;
     }
 
     try {
-      const gameConfig = {
-        bestOfSeries: type === 'quick' ? 1 : type === 'bo3' ? 3 : 5,
-        turnTimeLimit: 20,
-        maxHealth: 6,
+      const finalConfig = {
+        ...gameConfig,
         name: `${user.username}'s Game`,
       };
       
       // Send create game request via socket
-      const success = socketCreateGame(gameConfig);
+      const success = socketCreateGame(finalConfig);
       if (success) {
         // Mock game creation for now - will be replaced with actual socket response
         const mockGame = {
           id: `game_${Date.now()}`,
-          name: gameConfig.name,
-          config: gameConfig,
+          name: finalConfig.name,
+          config: finalConfig,
           players: [user],
           status: 'waiting',
         };
@@ -241,6 +232,12 @@ const LobbyScreen = ({ navigation }) => {
           ))
         )}
       </View>
+
+      <GameConfigModal
+        visible={showConfigModal}
+        onClose={() => setShowConfigModal(false)}
+        onConfirm={createGame}
+      />
     </ScrollView>
   );
 };

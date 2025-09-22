@@ -140,6 +140,7 @@
 
 
 
+
   - [x] 9.1 Create tournament lobby and management
 
 
@@ -158,14 +159,21 @@
     - Create final rankings display and results screen
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8_
 
-- [ ] 10. Add configuration and game modes
-  - [ ] 10.1 Implement configurable game settings
+- [x] 10. Add configuration and game modes
+
+
+
+  - [x] 10.1 Implement configurable game settings
+
+
     - Create Best of X series configuration (BO3, BO5)
     - Add custom timer settings for turn duration
     - Implement game mode selection interface
     - Add settings persistence and validation
     - _Requirements: 7.1, 7.2, 7.3, 7.4_
   
+
+
   - [ ] 10.2 Build series match management
     - Implement multi-game series tracking and scoring
     - Add series progress display and match transitions

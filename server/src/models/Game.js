@@ -37,8 +37,12 @@ const Game = sequelize.define('Game', {
     allowNull: false,
     validate: {
       min: 1,
-      max: 20
+      max: 50
     }
+  },
+  name: {
+    type: DataTypes.STRING(100),
+    allowNull: true
   },
   player1Id: {
     type: DataTypes.UUID,
@@ -105,6 +109,21 @@ const Game = sequelize.define('Game', {
   gameConfig: {
     type: DataTypes.JSONB,
     defaultValue: {},
+    allowNull: false
+  },
+  seriesScore: {
+    type: DataTypes.JSONB,
+    defaultValue: { player1: 0, player2: 0 },
+    allowNull: false
+  },
+  currentGameInSeries: {
+    type: DataTypes.INTEGER,
+    defaultValue: 1,
+    allowNull: false
+  },
+  gameHistory: {
+    type: DataTypes.JSONB,
+    defaultValue: [],
     allowNull: false
   },
   turnStartedAt: {
