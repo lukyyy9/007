@@ -58,7 +58,6 @@
 
 - [x] 5. Implement tournament system
 
-
   - [x] 5.1 Create tournament bracket generation
 
     - Implement single elimination bracket generation
@@ -75,11 +74,9 @@
     - Write integration tests for complete tournament flow
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8_
 
-- [-] 6. Create React Native client foundation
-
+- [x] 6. Create React Native client foundation
 
   - [x] 6.1 Set up navigation and basic screens
-
 
     - Implement React Navigation with stack and tab navigators
     - Create basic screen components (Lobby, GameRoom, GameBoard, Profile)
@@ -87,8 +84,7 @@
     - Set up global state management with Context API
     - _Requirements: 4.1, 8.1, 8.2, 8.3, 8.4_
   
-  - [ ] 6.2 Implement Socket.IO client integration
-
+  - [x] 6.2 Implement Socket.IO client integration
 
     - Set up Socket.IO client connection with reconnection logic
     - Create WebSocket service for handling real-time events
@@ -96,15 +92,19 @@
     - Add automatic reconnection with game state restoration
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
 
-- [ ] 7. Build game interface components
-  - [ ] 7.1 Create card selection interface
+- [x] 7. Build game interface components
+
+  - [x] 7.1 Create card selection interface
+
     - Implement card grid with touch interactions
     - Add visual feedback for card selection (3 cards max)
     - Create dynamic action buttons based on available charges
     - Implement emoji-based resource display (⚡ charges, ❤️ health)
     - _Requirements: 4.2, 4.3, 4.4_
   
-  - [ ] 7.2 Implement game timer and turn management
+  - [x] 7.2 Implement game timer and turn management
+
+
     - Create visual countdown timer component with animations
     - Add automatic card selection when timer expires (3x Charger)
     - Implement turn phase indicators and transitions

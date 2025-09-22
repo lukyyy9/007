@@ -119,8 +119,37 @@ export const SocketProvider = ({ children }) => {
       dispatch({ type: 'UPDATE_GAME_STATE', payload: gameState });
     });
 
+    SocketService.on('game:timer-update', (timerData) => {
+      // Update game state with timer information
+      dispatch({ type: 'UPDATE_GAME_STATE', payload: {
+        ...state.gameState,
+        turnTimer: timerData.timeRemaining,
+        turnTimerServer: timerData.serverTime,
+        phase: timerData.phase,
+        currentTurn: timerData.currentTurn
+      }});
+    });
+
+    SocketService.on('game:turn-timeout', (data) => {
+      console.log('Turn timeout:', data);
+      dispatch({ type: 'UPDATE_GAME_STATE', payload: data.gameState });
+    });
+
+    SocketService.on('game:turn-resolved', (data) => {
+      console.log('Turn resolved:', data);
+      dispatch({ type: 'UPDATE_GAME_STATE', payload: data.gameState });
+    });
+
+    SocketService.on('game:player-ready', (data) => {
+      console.log('Player ready:', data);
+      dispatch({ type: 'UPDATE_GAME_STATE', payload: data.gameState });
+    });
+
     SocketService.on('game:joined', (gameData) => {
       console.log('Joined game:', gameData);
+      if (gameData.gameState) {
+        dispatch({ type: 'UPDATE_GAME_STATE', payload: gameData.gameState });
+      }
     });
 
     SocketService.on('game:left', (gameData) => {

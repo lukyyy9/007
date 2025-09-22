@@ -505,24 +505,38 @@ class GameHandlers {
   setupTurnTimers() {
     this.turnTimerInterval = setInterval(() => {
       for (const [gameId, game] of gameEngine.activeGames.entries()) {
-        if (game.phase === 'selection' && game.turnTimer && Date.now() > game.turnTimer) {
-          console.log(`Turn timeout for game ${gameId}`);
+        if (game.phase === 'selection' && game.turnTimer) {
+          const now = Date.now();
+          const timeRemaining = Math.max(0, Math.floor((game.turnTimer - now) / 1000));
           
-          try {
-            const result = gameEngine.handleTurnTimeout(gameId);
-            if (result) {
-              const gameState = gameEngine.getGameState(gameId);
-              
-              this.broadcastToGame(gameId, 'game:turn-timeout', {
-                result,
-                gameState
-              });
+          // Broadcast timer updates every second
+          this.broadcastToGame(gameId, 'game:timer-update', {
+            timeRemaining,
+            serverTime: game.turnTimer,
+            phase: game.phase,
+            currentTurn: game.currentTurn
+          });
+          
+          // Handle timeout
+          if (now >= game.turnTimer) {
+            console.log(`Turn timeout for game ${gameId}`);
+            
+            try {
+              const result = gameEngine.handleTurnTimeout(gameId);
+              if (result) {
+                const gameState = gameEngine.getGameState(gameId);
+                
+                this.broadcastToGame(gameId, 'game:turn-timeout', {
+                  result,
+                  gameState
+                });
 
-              // Update database
-              this.updateGameInDB(gameId, gameState, result);
+                // Update database
+                this.updateGameInDB(gameId, gameState, result);
+              }
+            } catch (error) {
+              console.error(`Error handling timeout for game ${gameId}:`, error);
             }
-          } catch (error) {
-            console.error(`Error handling timeout for game ${gameId}:`, error);
           }
         }
       }
