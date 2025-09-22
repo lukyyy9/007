@@ -21,7 +21,6 @@ class GameHandlers {
    */
   registerHandlers(socket) {
     // Connection management
-    socket.on('user:authenticate', (data) => this.handleUserAuthenticate(socket, data));
     socket.on('disconnect', () => this.handleDisconnect(socket));
 
     // Game events
@@ -38,41 +37,13 @@ class GameHandlers {
     socket.on('game:request-sync', (data) => this.handleRequestSync(socket, data));
   }
 
-  /**
-   * Handle user authentication for socket connection
-   */
-  async handleUserAuthenticate(socket, data) {
-    try {
-      const { userId, token } = data;
 
-      // Verify token (simplified - in production, verify JWT)
-      if (!userId || !token) {
-        socket.emit('auth:error', { error: 'Invalid authentication data' });
-        return;
-      }
-
-      // Store user connection
-      this.connectedUsers.set(socket.id, userId);
-      
-      if (!this.userSockets.has(userId)) {
-        this.userSockets.set(userId, new Set());
-      }
-      this.userSockets.get(userId).add(socket.id);
-
-      socket.emit('auth:success', { userId });
-      
-      console.log(`User ${userId} authenticated on socket ${socket.id}`);
-    } catch (error) {
-      console.error('Authentication error:', error);
-      socket.emit('auth:error', { error: 'Authentication failed' });
-    }
-  }
 
   /**
    * Handle socket disconnection
    */
   handleDisconnect(socket) {
-    const userId = this.connectedUsers.get(socket.id);
+    const userId = socket.userId || this.connectedUsers.get(socket.id);
     
     if (userId) {
       // Remove from user sockets
@@ -108,9 +79,9 @@ class GameHandlers {
   async handleGameJoin(socket, data) {
     try {
       const { gameId } = data;
-      const userId = this.connectedUsers.get(socket.id);
+      const userId = socket.userId || this.connectedUsers.get(socket.id);
 
-      if (!userId) {
+      if (!userId || !socket.authenticated) {
         socket.emit('game:error', { error: 'Not authenticated' });
         return;
       }
@@ -190,9 +161,9 @@ class GameHandlers {
   async handleGameLeave(socket, data) {
     try {
       const { gameId } = data;
-      const userId = this.connectedUsers.get(socket.id);
+      const userId = socket.userId || this.connectedUsers.get(socket.id);
 
-      if (!userId) {
+      if (!userId || !socket.authenticated) {
         socket.emit('game:error', { error: 'Not authenticated' });
         return;
       }
@@ -227,9 +198,9 @@ class GameHandlers {
   async handleCardSelection(socket, data) {
     try {
       const { gameId, cards } = data;
-      const userId = this.connectedUsers.get(socket.id);
+      const userId = socket.userId || this.connectedUsers.get(socket.id);
 
-      if (!userId) {
+      if (!userId || !socket.authenticated) {
         socket.emit('game:error', { error: 'Not authenticated' });
         return;
       }
@@ -299,9 +270,9 @@ class GameHandlers {
   async handleGetGameState(socket, data) {
     try {
       const { gameId } = data;
-      const userId = this.connectedUsers.get(socket.id);
+      const userId = socket.userId || this.connectedUsers.get(socket.id);
 
-      if (!userId) {
+      if (!userId || !socket.authenticated) {
         socket.emit('game:error', { error: 'Not authenticated' });
         return;
       }
@@ -341,9 +312,9 @@ class GameHandlers {
   async handleGameForfeit(socket, data) {
     try {
       const { gameId } = data;
-      const userId = this.connectedUsers.get(socket.id);
+      const userId = socket.userId || this.connectedUsers.get(socket.id);
 
-      if (!userId) {
+      if (!userId || !socket.authenticated) {
         socket.emit('game:error', { error: 'Not authenticated' });
         return;
       }
@@ -387,9 +358,9 @@ class GameHandlers {
   async handleRequestSync(socket, data) {
     try {
       const { gameId } = data;
-      const userId = this.connectedUsers.get(socket.id);
+      const userId = socket.userId || this.connectedUsers.get(socket.id);
 
-      if (!userId) {
+      if (!userId || !socket.authenticated) {
         socket.emit('game:error', { error: 'Not authenticated' });
         return;
       }
@@ -407,9 +378,9 @@ class GameHandlers {
   async handleGameStart(socket, data) {
     try {
       const { gameId, gameConfig } = data;
-      const userId = this.connectedUsers.get(socket.id);
+      const userId = socket.userId || this.connectedUsers.get(socket.id);
 
-      if (!userId) {
+      if (!userId || !socket.authenticated) {
         socket.emit('game:error', { error: 'Not authenticated' });
         return;
       }
@@ -481,9 +452,9 @@ class GameHandlers {
   async handleUpdateSettings(socket, data) {
     try {
       const { gameId, settings } = data;
-      const userId = this.connectedUsers.get(socket.id);
+      const userId = socket.userId || this.connectedUsers.get(socket.id);
 
-      if (!userId) {
+      if (!userId || !socket.authenticated) {
         socket.emit('game:error', { error: 'Not authenticated' });
         return;
       }
@@ -530,9 +501,9 @@ class GameHandlers {
   async handlePlayerReady(socket, data) {
     try {
       const { gameId, ready } = data;
-      const userId = this.connectedUsers.get(socket.id);
+      const userId = socket.userId || this.connectedUsers.get(socket.id);
 
-      if (!userId) {
+      if (!userId || !socket.authenticated) {
         socket.emit('game:error', { error: 'Not authenticated' });
         return;
       }

@@ -29,20 +29,33 @@ class SocketHandler {
         if (!token) {
           // Allow connection but mark as unauthenticated
           socket.authenticated = false;
+          socket.userId = null;
           return next();
         }
 
         const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
         const decoded = jwt.verify(token, JWT_SECRET);
         
-        // You could verify user exists in database here
+        // Verify user exists in database
+        const { User } = require('../models');
+        const user = await User.findByPk(decoded.userId);
+        
+        if (!user || !user.isActive) {
+          console.log(`Invalid user for token: ${decoded.userId}`);
+          socket.authenticated = false;
+          socket.userId = null;
+          return next();
+        }
+        
         socket.userId = decoded.userId;
         socket.authenticated = true;
         
+        console.log(`Socket ${socket.id} authenticated as user ${decoded.userId}`);
         next();
       } catch (error) {
         console.error('Socket authentication error:', error);
         socket.authenticated = false;
+        socket.userId = null;
         next(); // Allow connection but mark as unauthenticated
       }
     });
@@ -53,11 +66,21 @@ class SocketHandler {
    */
   setupConnectionHandling() {
     this.io.on('connection', (socket) => {
-      console.log(`Socket connected: ${socket.id}, authenticated: ${socket.authenticated}`);
+      console.log(`Socket connected: ${socket.id}, authenticated: ${socket.authenticated}, userId: ${socket.userId}`);
 
       // Store authenticated user
       if (socket.authenticated && socket.userId) {
         this.connectedUsers.set(socket.id, socket.userId);
+        
+        // Also register with game handlers
+        if (this.gameHandlers) {
+          this.gameHandlers.connectedUsers.set(socket.id, socket.userId);
+          
+          if (!this.gameHandlers.userSockets.has(socket.userId)) {
+            this.gameHandlers.userSockets.set(socket.userId, new Set());
+          }
+          this.gameHandlers.userSockets.get(socket.userId).add(socket.id);
+        }
       }
 
       // Register all event handlers
