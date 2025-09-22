@@ -25,19 +25,19 @@ const LoginScreen = ({ navigation }) => {
 
     setIsLoading(true);
     try {
-      // TODO: Replace with actual API call in task 6.2
-      // For now, simulate login with mock data
-      const mockUser = {
-        id: '1',
-        username: username.trim(),
-        email: `${username.trim()}@example.com`,
-      };
-      const mockToken = 'mock-jwt-token';
+      const { AuthAPI } = require('../services');
+      const response = await AuthAPI.login(username.trim(), password);
       
-      await login(mockUser, mockToken);
-      // Navigation will be handled by App.js based on auth state
+      if (response.user && response.token) {
+        await login(response.user, response.token);
+        // Navigation will be handled by App.js based on auth state
+      } else {
+        throw new Error('Invalid response from server');
+      }
     } catch (error) {
-      Alert.alert('Login Failed', 'Invalid credentials. Please try again.');
+      console.error('Login error:', error);
+      const { handleApiError } = require('../utils');
+      Alert.alert('Login Failed', handleApiError(error));
     } finally {
       setIsLoading(false);
     }

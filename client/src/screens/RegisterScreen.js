@@ -62,19 +62,23 @@ const RegisterScreen = ({ navigation }) => {
 
     setIsLoading(true);
     try {
-      // TODO: Replace with actual API call in task 6.2
-      // For now, simulate registration with mock data
-      const mockUser = {
-        id: '1',
-        username: formData.username.trim(),
-        email: formData.email.trim(),
-      };
-      const mockToken = 'mock-jwt-token';
+      const { AuthAPI } = require('../services');
+      const response = await AuthAPI.register(
+        formData.username.trim(),
+        formData.email.trim(),
+        formData.password
+      );
       
-      await login(mockUser, mockToken);
-      // Navigation will be handled by App.js based on auth state
+      if (response.user && response.token) {
+        await login(response.user, response.token);
+        // Navigation will be handled by App.js based on auth state
+      } else {
+        throw new Error('Invalid response from server');
+      }
     } catch (error) {
-      Alert.alert('Registration Failed', 'Please try again later.');
+      console.error('Registration error:', error);
+      const { handleApiError } = require('../utils');
+      Alert.alert('Registration Failed', handleApiError(error));
     } finally {
       setIsLoading(false);
     }

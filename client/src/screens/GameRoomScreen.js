@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import { useGame } from '../context/GameContext';
 import { useSocket } from '../context/SocketContext';
+import { useAuth } from '../context/AuthContext';
+import SocketService from '../services/SocketService';
 import ConnectionStatus from '../components/ConnectionStatus';
 import SeriesProgressDisplay from '../components/SeriesProgressDisplay';
 
@@ -17,7 +19,8 @@ const GameRoomScreen = ({ navigation }) => {
   const [isReady, setIsReady] = useState(false);
   const [gameSettings, setGameSettings] = useState({});
   const { currentGame, leaveGame, gameConfig } = useGame();
-  const { isConnected, leaveGame: socketLeaveGame } = useSocket();
+  const { isConnected, leaveGame: socketLeaveGame, gameState } = useSocket();
+  const { user } = useAuth();
 
   useEffect(() => {
     if (!currentGame) {
@@ -25,20 +28,146 @@ const GameRoomScreen = ({ navigation }) => {
       return;
     }
 
-    // TODO: Replace with actual WebSocket events in task 6.2
-    // Mock data for now
-    setPlayers([
-      { id: '1', username: 'Player1', isReady: true, isHost: true },
-      { id: '2', username: 'Player2', isReady: false, isHost: false },
-    ]);
-
+    // Initialize game settings
     setGameSettings({
-      bestOfSeries: gameConfig.bestOfSeries,
-      turnTimeLimit: gameConfig.turnTimeLimit,
-      maxHealth: gameConfig.maxHealth,
+      bestOfSeries: gameConfig.bestOfSeries || 1,
+      turnTimeLimit: gameConfig.turnTimeLimit || 20,
+      maxHealth: gameConfig.maxHealth || 6,
       gameMode: gameConfig.gameMode || 'standard',
     });
-  }, [currentGame, gameConfig, navigation]);
+
+    // Set initial players if available from currentGame
+    if (currentGame.player1Id && user?.id) {
+      const initialPlayers = [];
+      
+      // Add player 1 (host)
+      initialPlayers.push({
+        id: currentGame.player1Id,
+        username: currentGame.player1?.username || 'Player 1',
+        isReady: false,
+        isHost: true
+      });
+
+      // Add player 2 if exists
+      if (currentGame.player2Id) {
+        initialPlayers.push({
+          id: currentGame.player2Id,
+          username: currentGame.player2?.username || 'Player 2',
+          isReady: false,
+          isHost: false
+        });
+      }
+
+      setPlayers(initialPlayers);
+    }
+
+    // Join the game room via WebSocket
+    if (isConnected && currentGame.id) {
+      SocketService.joinGame(currentGame.id);
+    }
+  }, [currentGame, gameConfig, navigation, isConnected, user]);
+
+  // WebSocket event listeners
+  useEffect(() => {
+    if (!isConnected || !currentGame?.id) return;
+
+    // Game room events
+    const handleGameJoined = (data) => {
+      console.log('Game joined:', data);
+      if (data.gameState && data.gameState.players) {
+        setPlayers(data.gameState.players.map(player => ({
+          id: player.id,
+          username: player.username,
+          isReady: player.ready || false,
+          isHost: player.id === currentGame.player1Id // First player is the host
+        })));
+      }
+    };
+
+    const handlePlayerJoined = (data) => {
+      console.log('Player joined:', data);
+      // Refresh game state
+      SocketService.getGameState(currentGame.id);
+    };
+
+    const handlePlayerLeft = (data) => {
+      console.log('Player left:', data);
+      setPlayers(prev => prev.filter(p => p.id !== data.userId));
+    };
+
+    const handlePlayerReady = (data) => {
+      console.log('Player ready status changed:', data);
+      if (data.gameState && data.gameState.players) {
+        setPlayers(data.gameState.players.map(player => ({
+          id: player.id,
+          username: player.username,
+          isReady: player.ready || false,
+          isHost: player.id === currentGame.player1Id
+        })));
+      } else if (data.userId && data.ready !== undefined) {
+        // Update specific player's ready status
+        setPlayers(prev => prev.map(player => 
+          player.id === data.userId 
+            ? { ...player, isReady: data.ready }
+            : player
+        ));
+      }
+    };
+
+    const handleGameStateUpdate = (data) => {
+      console.log('Game state updated:', data);
+      if (data.gameState && data.gameState.players) {
+        setPlayers(data.gameState.players.map(player => ({
+          id: player.id,
+          username: player.username,
+          isReady: player.ready || false,
+          isHost: player.id === currentGame.player1Id
+        })));
+      }
+    };
+
+    const handleSettingsUpdate = (data) => {
+      console.log('Game settings updated:', data);
+      if (data.settings) {
+        setGameSettings(prev => ({ ...prev, ...data.settings }));
+      }
+    };
+
+    const handleGameStarted = (data) => {
+      console.log('Game started:', data);
+      navigation.navigate('GameBoard');
+    };
+
+    const handleGameError = (data) => {
+      console.error('Game error:', data);
+      Alert.alert('Game Error', data.error || 'An error occurred');
+    };
+
+    // Register event listeners
+    SocketService.on('game:joined', handleGameJoined);
+    SocketService.on('game:player-joined', handlePlayerJoined);
+    SocketService.on('game:player-left', handlePlayerLeft);
+    SocketService.on('game:player-ready', handlePlayerReady);
+    SocketService.on('game:state-update', handleGameStateUpdate);
+    SocketService.on('game:settings-updated', handleSettingsUpdate);
+    SocketService.on('game:started', handleGameStarted);
+    SocketService.on('game:error', handleGameError);
+
+    // Request initial game state
+    SocketService.getGameState(currentGame.id);
+
+    // Cleanup function
+    return () => {
+      SocketService.off('game:joined', handleGameJoined);
+      SocketService.off('game:player-joined', handlePlayerJoined);
+      SocketService.off('game:player-left', handlePlayerLeft);
+      SocketService.off('game:player-ready', handlePlayerReady);
+      SocketService.off('game:state-update', handleGameStateUpdate);
+      SocketService.off('game:settings-updated', handleSettingsUpdate);
+      SocketService.off('game:started', handleGameStarted);
+      SocketService.off('game:error', handleGameError);
+    };
+  }, [isConnected, currentGame, navigation]);
 
   const handleToggleReady = () => {
     if (!isConnected) {
@@ -49,8 +178,10 @@ const GameRoomScreen = ({ navigation }) => {
     const newReadyState = !isReady;
     setIsReady(newReadyState);
     
-    // TODO: Send ready status to server via WebSocket
-    // For now, just update local state
+    // Send ready status to server via WebSocket
+    if (currentGame?.id) {
+      SocketService.setPlayerReady(currentGame.id, newReadyState);
+    }
   };
 
   const handleStartGame = () => {
@@ -65,8 +196,10 @@ const GameRoomScreen = ({ navigation }) => {
       return;
     }
 
-    // TODO: Send start game request to server in task 6.2
-    navigation.navigate('GameBoard');
+    // Send start game request to server
+    if (currentGame?.id) {
+      SocketService.startGame(currentGame.id, gameSettings);
+    }
   };
 
   const handleLeaveRoom = () => {
@@ -81,7 +214,7 @@ const GameRoomScreen = ({ navigation }) => {
           onPress: () => {
             // Send leave game request via socket if connected
             if (isConnected && currentGame?.id) {
-              socketLeaveGame(currentGame.id);
+              SocketService.leaveGame(currentGame.id);
             }
             
             leaveGame();
@@ -136,10 +269,14 @@ const GameRoomScreen = ({ navigation }) => {
 
   const updateSettings = (newSettings) => {
     setGameSettings(prev => ({ ...prev, ...newSettings }));
-    // TODO: Send settings update to server in task 6.2
+    
+    // Send settings update to server
+    if (currentGame?.id) {
+      SocketService.updateGameSettings(currentGame.id, newSettings);
+    }
   };
 
-  const isHost = players.find(p => p.isHost)?.id === '1'; // Mock current user ID
+  const isHost = currentGame?.player1Id === user?.id; // Check if current user is the host
 
   return (
     <View style={styles.container}>
@@ -147,6 +284,11 @@ const GameRoomScreen = ({ navigation }) => {
         <View style={styles.headerLeft}>
           <Text style={styles.title}>Game Room</Text>
           <ConnectionStatus style={styles.connectionStatus} />
+          {__DEV__ && (
+            <Text style={styles.debugText}>
+              Game ID: {currentGame?.id || 'None'} | User: {user?.username || 'None'}
+            </Text>
+          )}
         </View>
         <TouchableOpacity style={styles.leaveButton} onPress={handleLeaveRoom}>
           <Text style={styles.leaveButtonText}>Leave</Text>
@@ -219,7 +361,7 @@ const GameRoomScreen = ({ navigation }) => {
               winner: null,
               summary: `Best of ${gameSettings.bestOfSeries} - Game 1 (0-0)`
             }}
-            playerNames={players.map(p => p.username)}
+            playerNames={players.length > 0 ? players.map(p => p.username) : ['Player 1', 'Player 2']}
           />
         )}
 
@@ -313,6 +455,11 @@ const styles = StyleSheet.create({
   },
   connectionStatus: {
     alignSelf: 'flex-start',
+  },
+  debugText: {
+    fontSize: 10,
+    color: '#666',
+    marginTop: 4,
   },
   leaveButton: {
     paddingHorizontal: 15,

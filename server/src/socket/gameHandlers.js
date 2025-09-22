@@ -30,6 +30,9 @@ class GameHandlers {
     socket.on('game:select-cards', (data) => this.handleCardSelection(socket, data));
     socket.on('game:get-state', (data) => this.handleGetGameState(socket, data));
     socket.on('game:forfeit', (data) => this.handleGameForfeit(socket, data));
+    socket.on('game:start', (data) => this.handleGameStart(socket, data));
+    socket.on('game:update-settings', (data) => this.handleUpdateSettings(socket, data));
+    socket.on('game:player-ready', (data) => this.handlePlayerReady(socket, data));
 
     // Real-time game updates
     socket.on('game:request-sync', (data) => this.handleRequestSync(socket, data));
@@ -395,6 +398,157 @@ class GameHandlers {
     } catch (error) {
       console.error('Sync request error:', error);
       socket.emit('game:error', { error: 'Failed to sync game state' });
+    }
+  }
+
+  /**
+   * Handle game start request
+   */
+  async handleGameStart(socket, data) {
+    try {
+      const { gameId, gameConfig } = data;
+      const userId = this.connectedUsers.get(socket.id);
+
+      if (!userId) {
+        socket.emit('game:error', { error: 'Not authenticated' });
+        return;
+      }
+
+      // Check if game exists in database
+      const dbGame = await Game.findByPk(gameId);
+      if (!dbGame) {
+        socket.emit('game:error', { error: 'Game not found' });
+        return;
+      }
+
+      // Check if user is the host/creator
+      if (dbGame.player1Id !== userId) {
+        socket.emit('game:error', { error: 'Only the host can start the game' });
+        return;
+      }
+
+      // Check if game is in waiting status
+      if (dbGame.status !== 'waiting') {
+        socket.emit('game:error', { error: 'Game cannot be started' });
+        return;
+      }
+
+      // Update game status to active
+      await dbGame.update({
+        status: 'active',
+        gameConfig: gameConfig,
+        startedAt: new Date()
+      });
+
+      // Initialize game in engine if not exists
+      if (!gameEngine.activeGames.has(gameId)) {
+        const engineGame = gameEngine.createGame(gameConfig);
+        engineGame.id = gameId;
+        
+        // Add players to engine
+        if (dbGame.player1Id) {
+          const player1 = await User.findByPk(dbGame.player1Id);
+          gameEngine.addPlayer(gameId, {
+            id: player1.id,
+            username: player1.username
+          });
+        }
+        if (dbGame.player2Id) {
+          const player2 = await User.findByPk(dbGame.player2Id);
+          gameEngine.addPlayer(gameId, {
+            id: player2.id,
+            username: player2.username
+          });
+        }
+      }
+
+      // Broadcast game started to all players
+      this.broadcastToGame(gameId, 'game:started', {
+        gameId,
+        gameState: gameEngine.getGameState(gameId)
+      });
+
+      console.log(`Game ${gameId} started by user ${userId}`);
+    } catch (error) {
+      console.error('Game start error:', error);
+      socket.emit('game:error', { error: 'Failed to start game' });
+    }
+  }
+
+  /**
+   * Handle game settings update
+   */
+  async handleUpdateSettings(socket, data) {
+    try {
+      const { gameId, settings } = data;
+      const userId = this.connectedUsers.get(socket.id);
+
+      if (!userId) {
+        socket.emit('game:error', { error: 'Not authenticated' });
+        return;
+      }
+
+      // Check if game exists in database
+      const dbGame = await Game.findByPk(gameId);
+      if (!dbGame) {
+        socket.emit('game:error', { error: 'Game not found' });
+        return;
+      }
+
+      // Check if user is the host/creator
+      if (dbGame.player1Id !== userId) {
+        socket.emit('game:error', { error: 'Only the host can update settings' });
+        return;
+      }
+
+      // Check if game is still in waiting status
+      if (dbGame.status !== 'waiting') {
+        socket.emit('game:error', { error: 'Cannot update settings after game has started' });
+        return;
+      }
+
+      // Update game config
+      const updatedConfig = { ...dbGame.gameConfig, ...settings };
+      await dbGame.update({ gameConfig: updatedConfig });
+
+      // Broadcast settings update to all players
+      this.broadcastToGame(gameId, 'game:settings-updated', {
+        gameId,
+        settings: updatedConfig
+      });
+
+      console.log(`Game ${gameId} settings updated by user ${userId}`);
+    } catch (error) {
+      console.error('Update settings error:', error);
+      socket.emit('game:error', { error: 'Failed to update settings' });
+    }
+  }
+
+  /**
+   * Handle player ready status change
+   */
+  async handlePlayerReady(socket, data) {
+    try {
+      const { gameId, ready } = data;
+      const userId = this.connectedUsers.get(socket.id);
+
+      if (!userId) {
+        socket.emit('game:error', { error: 'Not authenticated' });
+        return;
+      }
+
+      // For now, just broadcast the ready status change
+      // In a full implementation, you might want to store this in the database
+      this.broadcastToGame(gameId, 'game:player-ready', {
+        userId,
+        ready,
+        gameId
+      });
+
+      console.log(`User ${userId} ready status changed to ${ready} in game ${gameId}`);
+    } catch (error) {
+      console.error('Player ready error:', error);
+      socket.emit('game:error', { error: 'Failed to update ready status' });
     }
   }
 

@@ -30,22 +30,44 @@ const LobbyScreen = ({ navigation }) => {
   }, []);
 
   const loadAvailableGames = async () => {
-    // TODO: Replace with actual API call in task 6.2
-    // Mock data for now
-    setAvailableGames([
-      { id: '1', name: 'Quick Match', players: 1, maxPlayers: 2, type: '1v1' },
-      { id: '2', name: 'Best of 3', players: 0, maxPlayers: 2, type: '1v1' },
-    ]);
+    try {
+      const { GameAPI } = require('../services');
+      const { transformGameData } = require('../utils');
+      const response = await GameAPI.getAvailableGames({ status: 'waiting', limit: 20 });
+
+      if (response.games) {
+        // Transform server data to match UI expectations
+        const transformedGames = response.games.map(game => ({
+          ...transformGameData(game),
+          players: game.player2Id ? 2 : 1,
+          maxPlayers: 2,
+          type: '1v1',
+        }));
+        setAvailableGames(transformedGames);
+      }
+    } catch (error) {
+      console.error('Error loading games:', error);
+      // Keep existing games on error, don't clear the list
+    }
   };
 
   const loadTournaments = async () => {
-    // TODO: Replace with actual API call in task 6.2
-    // Mock data for now
-    const mockTournaments = [
-      { id: '1', name: 'Daily Tournament', players: 6, maxPlayers: 8, status: 'waiting' },
-      { id: '2', name: 'Weekend Cup', players: 4, maxPlayers: 16, status: 'waiting' },
-    ];
-    updateTournaments(mockTournaments);
+    try {
+      const { TournamentAPI } = require('../services');
+      const { transformTournamentData } = require('../utils');
+      const response = await TournamentAPI.getTournaments({ status: 'waiting', limit: 10 });
+
+      if (response.tournaments) {
+        // Transform server data to match UI expectations
+        const transformedTournaments = response.tournaments.map(tournament =>
+          transformTournamentData(tournament)
+        );
+        updateTournaments(transformedTournaments);
+      }
+    } catch (error) {
+      console.error('Error loading tournaments:', error);
+      // Keep existing tournaments on error
+    }
   };
 
   const onRefresh = async () => {
@@ -65,30 +87,38 @@ const LobbyScreen = ({ navigation }) => {
     }
 
     try {
+      const { GameAPI } = require('../services');
       const finalConfig = {
         ...gameConfig,
         name: `${user.username}'s Game`,
       };
-      
-      // Send create game request via socket
-      const success = socketCreateGame(finalConfig);
-      if (success) {
-        // Mock game creation for now - will be replaced with actual socket response
-        const mockGame = {
-          id: `game_${Date.now()}`,
-          name: finalConfig.name,
-          config: finalConfig,
-          players: [user],
-          status: 'waiting',
+
+      // Create game via API
+      const response = await GameAPI.createGame(finalConfig);
+
+      if (response.game) {
+        // Transform server response to match expected format
+        const gameData = {
+          id: response.game.id,
+          name: response.game.name,
+          config: response.game.gameConfig,
+          players: [response.game.player1],
+          status: response.game.status,
         };
 
-        joinGame(mockGame);
+        joinGame(gameData);
+
+        // Also send create game request via socket for real-time updates
+        socketCreateGame(finalConfig);
+
         navigation.navigate('GameRoom');
       } else {
-        Alert.alert('Error', 'Failed to create game. Please check your connection.');
+        throw new Error('Invalid response from server');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to create game. Please try again.');
+      console.error('Error creating game:', error);
+      const { handleApiError } = require('../utils');
+      Alert.alert('Error', handleApiError(error));
     }
   };
 
@@ -99,34 +129,51 @@ const LobbyScreen = ({ navigation }) => {
     }
 
     try {
-      // Send join game request via socket
-      const success = socketJoinGame(gameId);
-      if (success) {
-        // Mock game join for now - will be replaced with actual socket response
-        const mockGame = {
-          id: gameId,
-          name: 'Joined Game',
-          config: { bestOfSeries: 1, turnTimeLimit: 20, maxHealth: 6 },
-          players: [user],
-          status: 'waiting',
+      const { GameAPI } = require('../services');
+
+      // Join game via API
+      const response = await GameAPI.joinGame(gameId);
+
+      if (response.game) {
+        // Transform server response to match expected format
+        const gameData = {
+          id: response.game.id,
+          name: response.game.name,
+          config: response.game.gameConfig,
+          players: [response.game.player1, response.game.player2].filter(Boolean),
+          status: response.game.status,
         };
 
-        joinGame(mockGame);
+        joinGame(gameData);
+
+        // Also send join game request via socket for real-time updates
+        socketJoinGame(gameId);
+
         navigation.navigate('GameRoom');
       } else {
-        Alert.alert('Error', 'Failed to join game. Please check your connection.');
+        throw new Error('Invalid response from server');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to join game. Please try again.');
+      console.error('Error joining game:', error);
+      const { handleApiError } = require('../utils');
+      Alert.alert('Error', handleApiError(error));
     }
   };
 
   const handleJoinTournament = async (tournamentId) => {
     try {
-      // TODO: Replace with actual API call in task 6.2
-      Alert.alert('Success', 'Joined tournament! You will be notified when it starts.');
+      const { TournamentAPI } = require('../services');
+      const response = await TournamentAPI.joinTournament(tournamentId);
+
+      if (response.tournament) {
+        Alert.alert('Success', 'Joined tournament! You will be notified when it starts.');
+        // Refresh tournaments list to show updated player count
+        loadTournaments();
+      }
     } catch (error) {
-      Alert.alert('Error', 'Failed to join tournament. Please try again.');
+      console.error('Error joining tournament:', error);
+      const { handleApiError } = require('../utils');
+      Alert.alert('Error', handleApiError(error));
     }
   };
 
@@ -163,16 +210,16 @@ const LobbyScreen = ({ navigation }) => {
         <TouchableOpacity style={styles.primaryButton} onPress={handleCreateGame}>
           <Text style={styles.primaryButtonText}>🎮 Create New Game</Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.secondaryButton} 
+
+        <TouchableOpacity
+          style={styles.secondaryButton}
           onPress={() => navigation.navigate('Tournament')}
         >
           <Text style={styles.secondaryButtonText}>🏆 Tournaments</Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.secondaryButton} 
+
+        <TouchableOpacity
+          style={styles.secondaryButton}
           onPress={() => navigation.navigate('Profile')}
         >
           <Text style={styles.secondaryButtonText}>👤 View Profile</Text>

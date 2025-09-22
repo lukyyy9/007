@@ -26,48 +26,56 @@ const ProfileScreen = ({ navigation }) => {
   }, []);
 
   const loadUserStats = async () => {
-    // TODO: Replace with actual API call in task 6.2
-    // Mock data for now
-    const mockStats = {
-      gamesPlayed: 25,
-      gamesWon: 18,
-      tournamentsPlayed: 5,
-      tournamentsWon: 2,
-      winRate: 72,
-    };
-    setStats(mockStats);
+    try {
+      const { UserAPI } = require('../services');
+      const response = await UserAPI.getUserStats();
+      
+      if (response.stats) {
+        setStats(response.stats);
+      } else {
+        // If no stats endpoint available, calculate from games
+        const gamesResponse = await UserAPI.getRecentMatches({ limit: 100 });
+        if (gamesResponse.games) {
+          const games = gamesResponse.games;
+          const gamesPlayed = games.length;
+          const gamesWon = games.filter(game => 
+            (game.winnerId === user?.id) || 
+            (game.winner?.id === user?.id)
+          ).length;
+          const winRate = gamesPlayed > 0 ? Math.round((gamesWon / gamesPlayed) * 100) : 0;
+          
+          setStats({
+            gamesPlayed,
+            gamesWon,
+            tournamentsPlayed: 0, // Would need separate tournament endpoint
+            tournamentsWon: 0,
+            winRate,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error loading user stats:', error);
+      // Keep default stats on error
+    }
   };
 
   const loadRecentMatches = async () => {
-    // TODO: Replace with actual API call in task 6.2
-    // Mock data for now
-    const mockMatches = [
-      {
-        id: '1',
-        opponent: 'Player123',
-        result: 'win',
-        date: '2024-01-15',
-        type: '1v1',
-        duration: '5:32',
-      },
-      {
-        id: '2',
-        opponent: 'GameMaster',
-        result: 'loss',
-        date: '2024-01-14',
-        type: 'Tournament',
-        duration: '8:45',
-      },
-      {
-        id: '3',
-        opponent: 'CardShark',
-        result: 'win',
-        date: '2024-01-14',
-        type: '1v1',
-        duration: '3:21',
-      },
-    ];
-    setRecentMatches(mockMatches);
+    try {
+      const { UserAPI } = require('../services');
+      const { transformMatchData } = require('../utils');
+      const response = await UserAPI.getRecentMatches({ limit: 10 });
+      
+      if (response.games) {
+        // Transform server data to match UI expectations
+        const transformedMatches = response.games.map(game => 
+          transformMatchData(game, user?.id)
+        );
+        setRecentMatches(transformedMatches);
+      }
+    } catch (error) {
+      console.error('Error loading recent matches:', error);
+      // Keep existing matches on error
+    }
   };
 
   const handleLogout = () => {

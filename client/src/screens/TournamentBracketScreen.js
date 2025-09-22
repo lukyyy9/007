@@ -121,35 +121,24 @@ const TournamentBracketScreen = ({ route, navigation }) => {
   const loadTournamentData = async () => {
     try {
       setLoading(true);
+      const { TournamentAPI } = require('../services');
       
       // Load tournament details
-      const tournamentResponse = await fetch(`/api/tournaments/${tournamentId}`, {
-        headers: {
-          'Authorization': `Bearer ${user.token}`,
-        },
-      });
-
-      if (tournamentResponse.ok) {
-        const tournamentData = await tournamentResponse.json();
-        setTournament(tournamentData.tournament);
+      const tournamentResponse = await TournamentAPI.getTournament(tournamentId);
+      if (tournamentResponse.tournament) {
+        setTournament(tournamentResponse.tournament);
       }
 
       // Load brackets if tournament is active or completed
       if (tournament?.status === 'active' || tournament?.status === 'completed') {
-        const bracketsResponse = await fetch(`/api/tournaments/${tournamentId}/brackets`, {
-          headers: {
-            'Authorization': `Bearer ${user.token}`,
-          },
-        });
-
-        if (bracketsResponse.ok) {
-          const bracketsData = await bracketsResponse.json();
-          setBrackets(bracketsData.brackets);
+        const bracketsResponse = await TournamentAPI.getTournamentBrackets(tournamentId);
+        if (bracketsResponse.brackets) {
+          setBrackets(bracketsResponse.brackets);
         }
       }
     } catch (error) {
       console.error('Error loading tournament data:', error);
-      Alert.alert('Error', 'Failed to load tournament data');
+      Alert.alert('Error', error.message || 'Failed to load tournament data');
     } finally {
       setLoading(false);
     }

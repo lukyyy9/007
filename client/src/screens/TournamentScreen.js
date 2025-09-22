@@ -19,11 +19,11 @@ const TournamentScreen = ({ navigation }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  
+
   const { user } = useAuth();
-  const { 
-    tournaments, 
-    currentTournament, 
+  const {
+    tournaments,
+    currentTournament,
     isInTournament,
     updateTournaments,
     joinTournament,
@@ -112,17 +112,11 @@ const TournamentScreen = ({ navigation }) => {
   const loadTournaments = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/tournaments?status=waiting', {
-        headers: {
-          'Authorization': `Bearer ${user.token}`,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        updateTournaments(data.tournaments);
-      } else {
-        console.error('Failed to load tournaments');
+      const { TournamentAPI } = require('../services');
+      const response = await TournamentAPI.getTournaments({ status: 'waiting', limit: 20 });
+      
+      if (response.tournaments) {
+        updateTournaments(response.tournaments);
       }
     } catch (error) {
       console.error('Error loading tournaments:', error);
@@ -144,31 +138,21 @@ const TournamentScreen = ({ navigation }) => {
     }
 
     try {
-      const response = await fetch('/api/tournaments/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user.token}`,
-        },
-        body: JSON.stringify(tournamentConfig),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
+      const { TournamentAPI } = require('../services');
+      const response = await TournamentAPI.createTournament(tournamentConfig);
+      
+      if (response.tournament) {
         Alert.alert('Success', 'Tournament created successfully!');
-        
+
         // Join the tournament room via socket
-        socket.emit('tournament:join', { tournamentId: data.tournament.id });
-        
+        socket.emit('tournament:join', { tournamentId: response.tournament.id });
+
         // Refresh tournaments list
         loadTournaments();
-      } else {
-        const errorData = await response.json();
-        Alert.alert('Error', errorData.error || 'Failed to create tournament');
       }
     } catch (error) {
       console.error('Error creating tournament:', error);
-      Alert.alert('Error', 'Failed to create tournament. Please try again.');
+      Alert.alert('Error', error.message || 'Failed to create tournament. Please try again.');
     }
   };
 
@@ -179,28 +163,19 @@ const TournamentScreen = ({ navigation }) => {
     }
 
     try {
-      const response = await fetch(`/api/tournaments/join/${tournamentId}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${user.token}`,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        
+      const { TournamentAPI } = require('../services');
+      const response = await TournamentAPI.joinTournament(tournamentId);
+      
+      if (response.tournament) {
         // Join the tournament room via socket
         socket.emit('tournament:join', { tournamentId });
-        
+
         Alert.alert('Success', 'Joined tournament successfully!');
         loadTournaments();
-      } else {
-        const errorData = await response.json();
-        Alert.alert('Error', errorData.error || 'Failed to join tournament');
       }
     } catch (error) {
       console.error('Error joining tournament:', error);
-      Alert.alert('Error', 'Failed to join tournament. Please try again.');
+      Alert.alert('Error', error.message || 'Failed to join tournament. Please try again.');
     }
   };
 
@@ -208,26 +183,19 @@ const TournamentScreen = ({ navigation }) => {
     if (!currentTournament) return;
 
     try {
-      const response = await fetch(`/api/tournaments/${currentTournament.id}/leave`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${user.token}`,
-        },
-      });
-
-      if (response.ok) {
+      const { TournamentAPI } = require('../services');
+      const response = await TournamentAPI.leaveTournament(currentTournament.id);
+      
+      if (response.message) {
         // Leave the tournament room via socket
         socket.emit('tournament:leave', { tournamentId: currentTournament.id });
-        
+
         Alert.alert('Success', 'Left tournament successfully');
         loadTournaments();
-      } else {
-        const errorData = await response.json();
-        Alert.alert('Error', errorData.error || 'Failed to leave tournament');
       }
     } catch (error) {
       console.error('Error leaving tournament:', error);
-      Alert.alert('Error', 'Failed to leave tournament. Please try again.');
+      Alert.alert('Error', error.message || 'Failed to leave tournament. Please try again.');
     }
   };
 
@@ -252,7 +220,7 @@ const TournamentScreen = ({ navigation }) => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.backButton}
             onPress={() => leaveTournament()}
           >
@@ -260,7 +228,7 @@ const TournamentScreen = ({ navigation }) => {
           </TouchableOpacity>
           <ConnectionStatus />
         </View>
-        
+
         <TournamentWaitingRoom
           tournament={currentTournament}
           currentUserId={user.id}
@@ -287,7 +255,7 @@ const TournamentScreen = ({ navigation }) => {
         >
           <Text style={styles.createButtonText}>🏆 Create Tournament</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={styles.refreshButton}
           onPress={handleRefresh}

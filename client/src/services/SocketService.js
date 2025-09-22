@@ -171,6 +171,23 @@ class SocketService {
     return this.emit('game:create', gameConfig);
   }
 
+  // Game room methods
+  setPlayerReady(gameId, ready) {
+    return this.emit('game:player-ready', { gameId, ready });
+  }
+
+  startGame(gameId, gameConfig) {
+    return this.emit('game:start', { gameId, gameConfig });
+  }
+
+  updateGameSettings(gameId, settings) {
+    return this.emit('game:update-settings', { gameId, settings });
+  }
+
+  getGameState(gameId) {
+    return this.emit('game:get-state', { gameId });
+  }
+
   // Tournament-specific methods
   joinTournament(tournamentId) {
     return this.emit('tournament:join', { tournamentId });

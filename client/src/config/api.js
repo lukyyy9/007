@@ -1,11 +1,15 @@
 // API configuration
 const API_CONFIG = {
   // Server URL - update this based on your development setup
-  BASE_URL: __DEV__ ? 'http://localhost:3000' : 'https://your-production-server.com',
-  
+  BASE_URL: __DEV__
+    ? (process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3000')
+    : 'https://your-production-server.com',
+
   // Socket.IO configuration
-  SOCKET_URL: __DEV__ ? 'http://localhost:3000' : 'https://your-production-server.com',
-  
+  SOCKET_URL: __DEV__
+    ? (process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:3000')
+    : 'https://your-production-server.com',
+
   // API endpoints
   ENDPOINTS: {
     HEALTH: '/health',
@@ -26,10 +30,10 @@ const API_CONFIG = {
       BRACKETS: '/api/tournament/brackets'
     }
   },
-  
+
   // Request timeout
   TIMEOUT: 10000,
-  
+
   // Socket.IO options
   SOCKET_OPTIONS: {
     transports: ['websocket'],
