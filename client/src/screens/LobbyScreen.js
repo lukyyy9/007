@@ -175,6 +175,13 @@ const LobbyScreen = ({ navigation }) => {
         
         <TouchableOpacity 
           style={styles.secondaryButton} 
+          onPress={() => navigation.navigate('Tournament')}
+        >
+          <Text style={styles.secondaryButtonText}>🏆 Tournaments</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.secondaryButton} 
           onPress={() => navigation.navigate('Profile')}
         >
           <Text style={styles.secondaryButtonText}>👤 View Profile</Text>

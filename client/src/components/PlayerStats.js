@@ -1,33 +1,22 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import EmojiResource from './EmojiResource';
+import StatusEffectIndicator from './StatusEffectIndicator';
 
 const PlayerStats = ({ 
   player, 
   isCurrentPlayer = false, 
   size = 'medium',
   showStatusEffects = true,
-  style = {} 
+  style = {},
+  animateChanges = true
 }) => {
   const getPlayerBorderColor = () => {
     if (isCurrentPlayer) return '#007AFF';
     return '#ff4444';
   };
 
-  const getStatusEffectEmoji = (effectType) => {
-    switch (effectType) {
-      case 'burn':
-        return '🔥';
-      case 'shield':
-        return '🛡️';
-      case 'vulnerable':
-        return '💔';
-      case 'charged':
-        return '⚡';
-      default:
-        return '❓';
-    }
-  };
+
 
   return (
     <View style={[
@@ -43,30 +32,28 @@ const PlayerStats = ({
           value={player.health}
           size={size}
           showLabel={false}
+          animated={animateChanges && player.health <= 2}
+          animationType="shake"
         />
         <EmojiResource
           type="charges"
           value={player.charges}
           size={size}
           showLabel={false}
+          animated={animateChanges && player.charges > 0}
+          animationType="glow"
         />
       </View>
 
       {showStatusEffects && player.statusEffects && player.statusEffects.length > 0 && (
         <View style={styles.statusEffectsContainer}>
           <Text style={styles.statusEffectsTitle}>Effects:</Text>
-          <View style={styles.statusEffects}>
-            {player.statusEffects.map((effect, index) => (
-              <View key={index} style={styles.statusEffect}>
-                <Text style={styles.statusEffectEmoji}>
-                  {getStatusEffectEmoji(effect.type)}
-                </Text>
-                <Text style={styles.statusEffectDuration}>
-                  {effect.duration}
-                </Text>
-              </View>
-            ))}
-          </View>
+          <StatusEffectIndicator
+            effects={player.statusEffects}
+            size="small"
+            layout="horizontal"
+            showDuration={true}
+          />
         </View>
       )}
 
@@ -112,28 +99,6 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 4,
     fontWeight: '500',
-  },
-  statusEffects: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  statusEffect: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 2,
-  },
-  statusEffectEmoji: {
-    fontSize: 12,
-  },
-  statusEffectDuration: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#666',
   },
   currentPlayerIndicator: {
     position: 'absolute',

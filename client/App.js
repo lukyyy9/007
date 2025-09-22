@@ -19,6 +19,8 @@ import {
   ProfileScreen,
   LoginScreen,
   RegisterScreen,
+  TournamentScreen,
+  TournamentBracketScreen,
 } from './src/screens';
 
 const Stack = createStackNavigator();
@@ -70,6 +72,17 @@ const MainTabs = () => (
       }}
     />
     <Tab.Screen 
+      name="Tournament" 
+      component={TournamentScreen}
+      options={{
+        title: 'Tournaments',
+        tabBarLabel: 'Tournaments',
+        tabBarIcon: ({ color }) => (
+          <Text style={{ color, fontSize: 20 }}>🏆</Text>
+        ),
+      }}
+    />
+    <Tab.Screen 
       name="Profile" 
       component={ProfileScreen}
       options={{
@@ -106,6 +119,15 @@ const GameStack = () => (
         title: 'Game Board',
         headerBackTitle: 'Room',
         headerLeft: null, // Prevent back navigation during game
+      }}
+    />
+    <Stack.Screen 
+      name="TournamentBracket" 
+      component={TournamentBracketScreen}
+      options={{ 
+        title: 'Tournament Bracket',
+        headerBackTitle: 'Tournament',
+        headerShown: false, // We handle the header in the component
       }}
     />
   </Stack.Navigator>

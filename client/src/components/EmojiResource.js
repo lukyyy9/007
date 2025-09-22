@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 
 const EmojiResource = ({
   type,
@@ -7,8 +8,115 @@ const EmojiResource = ({
   size = 'medium',
   showLabel = true,
   style = {},
-  animated = false
+  animated = false,
+  animationType = 'pulse' // 'pulse' | 'bounce' | 'shake' | 'glow'
 }) => {
+  const animationValue = useRef(new Animated.Value(1)).current;
+  const glowValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (animated) {
+      startAnimation();
+    } else {
+      // Reset to default state
+      animationValue.setValue(1);
+      glowValue.setValue(0);
+    }
+  }, [animated, animationType]);
+
+  const startAnimation = () => {
+    switch (animationType) {
+      case 'pulse':
+        startPulseAnimation();
+        break;
+      case 'bounce':
+        startBounceAnimation();
+        break;
+      case 'shake':
+        startShakeAnimation();
+        break;
+      case 'glow':
+        startGlowAnimation();
+        break;
+      default:
+        startPulseAnimation();
+    }
+  };
+
+  const startPulseAnimation = () => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(animationValue, {
+          toValue: 1.2,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(animationValue, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  };
+
+  const startBounceAnimation = () => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(animationValue, {
+          toValue: 1.3,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(animationValue, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.delay(1000),
+      ])
+    ).start();
+  };
+
+  const startShakeAnimation = () => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(animationValue, {
+          toValue: 1.1,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(animationValue, {
+          toValue: 0.9,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(animationValue, {
+          toValue: 1,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.delay(1500),
+      ])
+    ).start();
+  };
+
+  const startGlowAnimation = () => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: false, // Can't use native driver for shadow properties
+        }),
+        Animated.timing(glowValue, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: false,
+        }),
+      ])
+    ).start();
+  };
   const getEmoji = () => {
     switch (type) {
       case 'health':
@@ -86,12 +194,23 @@ const EmojiResource = ({
   const sizeStyles = getSizeStyles();
   const valueColor = getValueColor();
 
+  const animatedEmojiStyle = animated ? {
+    transform: [{ scale: animationValue }],
+    shadowOpacity: animationType === 'glow' ? glowValue : 0,
+    shadowRadius: animationType === 'glow' ? 10 : 0,
+    shadowColor: valueColor,
+  } : {};
+
   return (
     <View style={[styles.container, style]}>
       <View style={styles.resourceRow}>
-        <Text style={[sizeStyles.emoji, animated && styles.animated]}>
+        <Animated.Text style={[
+          sizeStyles.emoji, 
+          animatedEmojiStyle,
+          animated && styles.animated
+        ]}>
           {getEmoji()}
-        </Text>
+        </Animated.Text>
         <Text style={[sizeStyles.value, { color: valueColor }]}>
           {maxValue !== null ? `${value}/${maxValue}` : value}
         </Text>

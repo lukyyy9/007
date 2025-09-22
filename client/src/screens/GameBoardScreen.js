@@ -17,7 +17,11 @@ import {
   PlayerStats,
   GameTimer,
   TurnPhaseIndicator,
-  GameStateManager
+  GameStateManager,
+  GameLog,
+  CardEffectAnimation,
+  TurnTransition,
+  WinLoseScreen
 } from '../components';
 
 const GameBoardScreen = ({ navigation }) => {
@@ -32,8 +36,15 @@ const GameBoardScreen = ({ navigation }) => {
     turnTimerServer: null, // Server timestamp for timer synchronization
   });
   const [selectedCards, setSelectedCards] = useState([]);
-  const [gameLog, setGameLog] = useState([]);
+  const [gameLog, setGameLog] = useState([
+    { id: 1, timestamp: Date.now(), type: 'game', message: 'Game started', turn: 1 },
+    { id: 2, timestamp: Date.now(), type: 'info', message: 'Waiting for players to select cards...', turn: 1 }
+  ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentEffect, setCurrentEffect] = useState(null);
+  const [showTurnTransition, setShowTurnTransition] = useState(false);
+  const [showWinLoseScreen, setShowWinLoseScreen] = useState(false);
+  const [gameResult, setGameResult] = useState(null);
   
   const { currentGame, leaveGame, updateGameState } = useGame();
   const { isConnected, selectCards: socketSelectCards, leaveGame: socketLeaveGame, gameState: socketGameState } = useSocket();
@@ -80,7 +91,14 @@ const GameBoardScreen = ({ navigation }) => {
     // Send card selection to server via socket
     const success = socketSelectCards(currentGame?.id, selectedCards);
     if (success) {
-      setGameLog(prev => [...prev, `Turn ${gameState.currentTurn}: Cards submitted`]);
+      const cardNames = selectedCards.map(card => card.name).join(', ');
+      setGameLog(prev => [...prev, {
+        id: Date.now(),
+        timestamp: Date.now(),
+        type: 'info',
+        message: `Cards submitted: ${cardNames}`,
+        turn: gameState.currentTurn
+      }]);
       
       // Update local player ready state
       setGameState(prev => ({
@@ -106,27 +124,68 @@ const GameBoardScreen = ({ navigation }) => {
   const handleTimerExpired = () => {
     if (gameState.phase === 'selection' && selectedCards.length < 3 && !isSubmitting) {
       // This will be handled by GameStateManager
-      setGameLog(prev => [...prev, `Turn ${gameState.currentTurn}: Time expired - auto-selecting cards`]);
+      setGameLog(prev => [...prev, {
+        id: Date.now(),
+        timestamp: Date.now(),
+        type: 'warning',
+        message: 'Time expired - auto-selecting cards',
+        turn: gameState.currentTurn
+      }]);
     }
   };
 
   const handleGameStateUpdate = (newGameState) => {
+    const previousPhase = gameState.phase;
+    const previousTurn = gameState.currentTurn;
+    
     setGameState(newGameState);
     
-    // Reset submission state when phase changes
-    if (newGameState.phase !== gameState.phase) {
+    // Show turn transition animation when phase or turn changes
+    if (newGameState.phase !== previousPhase || newGameState.currentTurn !== previousTurn) {
+      setShowTurnTransition(true);
+      
+      // Reset submission state when phase changes
       setIsSubmitting(false);
       
       // Clear selected cards when entering new selection phase
       if (newGameState.phase === 'selection') {
         setSelectedCards([]);
       }
+      
+      // Check for game end
+      if (newGameState.phase === 'ended') {
+        const winner = newGameState.players.find(p => p.health > 0);
+        const currentPlayer = newGameState.players[0];
+        
+        if (winner) {
+          setGameResult(winner.id === currentPlayer.id ? 'win' : 'lose');
+        } else {
+          setGameResult('draw');
+        }
+        
+        setTimeout(() => {
+          setShowWinLoseScreen(true);
+        }, 2000);
+      }
+    }
+    
+    // Trigger card effect animations based on game log changes
+    if (newGameState.lastEffect) {
+      setCurrentEffect(newGameState.lastEffect);
+      setTimeout(() => setCurrentEffect(null), 2000);
     }
   };
 
   const handleAutoSelectCards = (autoCards) => {
     setSelectedCards(prev => [...prev, ...autoCards]);
-    setGameLog(prev => [...prev, `Turn ${gameState.currentTurn}: Auto-selected ${autoCards.length} Charger cards`]);
+    setGameLog(prev => [...prev, {
+      id: Date.now(),
+      timestamp: Date.now(),
+      type: 'charge',
+      message: `Auto-selected ${autoCards.length} Charger cards`,
+      turn: gameState.currentTurn,
+      details: 'Cards were automatically selected due to time expiry'
+    }]);
   };
 
   const handleLeaveGame = () => {
@@ -235,14 +294,13 @@ const GameBoardScreen = ({ navigation }) => {
       )}
 
       {/* Game Log */}
-      <View style={styles.logContainer}>
-        <Text style={styles.logTitle}>Game Log:</Text>
-        <ScrollView style={styles.logScroll}>
-          {gameLog.map((entry, index) => (
-            <Text key={index} style={styles.logEntry}>{entry}</Text>
-          ))}
-        </ScrollView>
-      </View>
+      <GameLog
+        entries={gameLog}
+        maxHeight={120}
+        showTimestamps={false}
+        autoScroll={true}
+        style={styles.gameLog}
+      />
 
       {/* Game State Manager */}
       <GameStateManager
@@ -252,6 +310,39 @@ const GameBoardScreen = ({ navigation }) => {
         onAutoSelectCards={handleAutoSelectCards}
         onTimerExpired={handleTimerExpired}
         onSubmitCards={handleSubmitCards}
+      />
+
+      {/* Card Effect Animation */}
+      <CardEffectAnimation
+        effect={currentEffect}
+        isVisible={!!currentEffect}
+        onComplete={() => setCurrentEffect(null)}
+      />
+
+      {/* Turn Transition Animation */}
+      <TurnTransition
+        isVisible={showTurnTransition}
+        turnNumber={gameState.currentTurn}
+        phase={gameState.phase}
+        onComplete={() => setShowTurnTransition(false)}
+      />
+
+      {/* Win/Lose Screen */}
+      <WinLoseScreen
+        isVisible={showWinLoseScreen}
+        result={gameResult}
+        playerStats={gameState.players[0]}
+        onPlayAgain={() => {
+          setShowWinLoseScreen(false);
+          setGameResult(null);
+          // Reset game state for new game
+          navigation.navigate('Lobby');
+        }}
+        onBackToLobby={() => {
+          setShowWinLoseScreen(false);
+          setGameResult(null);
+          handleLeaveGame();
+        }}
       />
     </View>
   );
@@ -266,13 +357,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 15,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    minHeight: 60,
   },
   headerLeft: {
     flex: 1,
+    minWidth: 0, // Allows text to truncate if needed
   },
   turnText: {
     fontSize: 16,
@@ -287,42 +381,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 15,
     gap: 10,
+    backgroundColor: '#f8f9fa',
   },
   playerStatsContainer: {
     flex: 1,
+    minWidth: 0, // Prevents overflow on small screens
   },
   phaseIndicator: {
     marginHorizontal: 15,
+    marginVertical: 8,
   },
   actionContainer: {
     padding: 15,
     backgroundColor: 'white',
     borderTopWidth: 1,
     borderTopColor: '#eee',
+    minHeight: 70,
   },
   submitButton: {
     width: '100%',
   },
-  logContainer: {
-    maxHeight: 100,
-    backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    padding: 15,
-  },
-  logTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#333',
-  },
-  logScroll: {
-    maxHeight: 60,
-  },
-  logEntry: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 2,
+  gameLog: {
+    flex: 0,
+    minHeight: 120,
+    maxHeight: 150,
   },
 });
 
