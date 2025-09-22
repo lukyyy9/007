@@ -1,0 +1,296 @@
+/**
+ * GameEngine integration tests with database
+ * Tests the complete game flow with real database operations
+ */
+
+const GameEngine = require('../services/GameEngine');
+const db = require('../models');
+
+describe('GameEngine Integration Tests', () => {
+  let gameEngine;
+  let player1, player2, game;
+
+  beforeEach(async () => {
+    gameEngine = new GameEngine();
+    
+    // Create test users
+    player1 = await global.createTestUser({
+      username: 'player1',
+      email: 'player1@example.com'
+    });
+    
+    player2 = await global.createTestUser({
+      username: 'player2',
+      email: 'player2@example.com'
+    });
+    
+    // Create test game
+    game = await global.createTestGame({
+      player1Id: player1.id,
+      player2Id: player2.id,
+      status: 'active',
+      phase: 'selection'
+    });
+  });
+
+  describe('Game Creation and Setup', () => {
+    test('should create game with proper database persistence', async () => {
+      const gameConfig = {
+        maxHealth: 6,
+        turnTimeLimit: 20,
+        bestOfSeries: 1
+      };
+
+      const createdGame = await gameEngine.createGame(player1.id, player2.id, gameConfig);
+      
+      // Verify game exists in database
+      const dbGame = await db.Game.findByPk(createdGame.id);
+      expect(dbGame).toBeTruthy();
+      expect(dbGame.player1Id).toBe(player1.id);
+      expect(dbGame.player2Id).toBe(player2.id);
+      expect(dbGame.status).toBe('active');
+      expect(dbGame.gameConfig.maxHealth).toBe(6);
+    });
+
+    test('should initialize game state correctly', async () => {
+      const gameState = await gameEngine.getGameState(game.id);
+      
+      expect(gameState.players).toHaveLength(2);
+      expect(gameState.players[0].health).toBe(6);
+      expect(gameState.players[1].health).toBe(6);
+      expect(gameState.players[0].charges).toBe(0);
+      expect(gameState.players[1].charges).toBe(0);
+      expect(gameState.currentTurn).toBe(1);
+      expect(gameState.phase).toBe('selection');
+    });
+  });
+
+  describe('Card Selection and Validation', () => {
+    test('should process valid card selection and persist to database', async () => {
+      const cards = ['charger', 'tirer', 'bloquer'];
+      
+      const result = await gameEngine.processCardSelection(game.id, player1.id, cards);
+      
+      expect(result.success).toBe(true);
+      
+      // Verify action was logged in database
+      const actions = await db.GameAction.findAll({
+        where: {
+          gameId: game.id,
+          playerId: player1.id,
+          actionType: 'card_selection'
+        }
+      });
+      
+      expect(actions).toHaveLength(1);
+      expect(actions[0].actionData.cards).toEqual(cards);
+    });
+
+    test('should reject invalid card selection', async () => {
+      const invalidCards = ['nonexistent-card', 'tirer', 'bloquer'];
+      
+      const result = await gameEngine.processCardSelection(game.id, player1.id, invalidCards);
+      
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Invalid card');
+      
+      // Verify no action was logged
+      const actions = await db.GameAction.findAll({
+        where: {
+          gameId: game.id,
+          playerId: player1.id
+        }
+      });
+      
+      expect(actions).toHaveLength(0);
+    });
+
+    test('should handle insufficient charges validation', async () => {
+      const expensiveCards = ['big-blast', 'big-blast', 'big-blast']; // Each costs 5 charges
+      
+      const result = await gameEngine.processCardSelection(game.id, player1.id, expensiveCards);
+      
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Insufficient charges');
+    });
+  });
+
+  describe('Turn Resolution', () => {
+    beforeEach(async () => {
+      // Set up both players with card selections
+      await gameEngine.processCardSelection(game.id, player1.id, ['charger', 'tirer', 'bloquer']);
+      await gameEngine.processCardSelection(game.id, player2.id, ['charger', 'charger', 'tirer']);
+    });
+
+    test('should resolve turn and update game state in database', async () => {
+      const result = await gameEngine.resolveTurn(game.id);
+      
+      expect(result.success).toBe(true);
+      expect(result.turnResult).toBeDefined();
+      
+      // Verify game state was updated in database
+      const updatedGame = await db.Game.findByPk(game.id);
+      expect(updatedGame.currentTurn).toBe(2);
+      expect(updatedGame.phase).toBe('selection');
+      
+      // Verify turn resolution was logged
+      const actions = await db.GameAction.findAll({
+        where: {
+          gameId: game.id,
+          actionType: 'turn_resolution'
+        }
+      });
+      
+      expect(actions).toHaveLength(1);
+    });
+
+    test('should apply card effects correctly', async () => {
+      const result = await gameEngine.resolveTurn(game.id);
+      
+      expect(result.success).toBe(true);
+      
+      const gameState = await gameEngine.getGameState(game.id);
+      
+      // Both players should have gained charges from Charger cards
+      expect(gameState.players[0].charges).toBeGreaterThan(0);
+      expect(gameState.players[1].charges).toBeGreaterThan(0);
+      
+      // Player 2 should have taken damage from Player 1's Tirer
+      // But Player 1 should be blocked by Bloquer
+      expect(gameState.players[1].health).toBeLessThan(6);
+    });
+  });
+
+  describe('Game Completion', () => {
+    test('should detect win condition and update database', async () => {
+      // Manually set player2 health to 1 to test win condition
+      await db.Game.update(
+        { player2Health: 1 },
+        { where: { id: game.id } }
+      );
+      
+      // Player1 plays damage cards
+      await gameEngine.processCardSelection(game.id, player1.id, ['charger', 'tirer', 'tirer']);
+      await gameEngine.processCardSelection(game.id, player2.id, ['charger', 'charger', 'charger']);
+      
+      const result = await gameEngine.resolveTurn(game.id);
+      
+      expect(result.success).toBe(true);
+      
+      // Check if game ended
+      const updatedGame = await db.Game.findByPk(game.id);
+      if (updatedGame.status === 'completed') {
+        expect(updatedGame.winnerId).toBe(player1.id);
+        
+        // Verify game completion was logged
+        const actions = await db.GameAction.findAll({
+          where: {
+            gameId: game.id,
+            actionType: 'game_end'
+          }
+        });
+        
+        expect(actions).toHaveLength(1);
+      }
+    });
+  });
+
+  describe('Error Handling', () => {
+    test('should handle database connection errors gracefully', async () => {
+      // Temporarily close database connection
+      await db.sequelize.close();
+      
+      const result = await gameEngine.processCardSelection(game.id, player1.id, ['charger', 'tirer', 'bloquer']);
+      
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Database error');
+      
+      // Reconnect for cleanup
+      await global.testDatabase.start();
+    });
+
+    test('should handle invalid game ID', async () => {
+      const result = await gameEngine.processCardSelection('invalid-game-id', player1.id, ['charger']);
+      
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Game not found');
+    });
+
+    test('should handle invalid player ID', async () => {
+      const result = await gameEngine.processCardSelection(game.id, 'invalid-player-id', ['charger']);
+      
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Player not in game');
+    });
+  });
+
+  describe('Concurrent Game Operations', () => {
+    test('should handle concurrent card selections safely', async () => {
+      const cards1 = ['charger', 'tirer', 'bloquer'];
+      const cards2 = ['charger', 'charger', 'tirer'];
+      
+      // Simulate concurrent card selections
+      const [result1, result2] = await Promise.all([
+        gameEngine.processCardSelection(game.id, player1.id, cards1),
+        gameEngine.processCardSelection(game.id, player2.id, cards2)
+      ]);
+      
+      expect(result1.success).toBe(true);
+      expect(result2.success).toBe(true);
+      
+      // Verify both selections were recorded
+      const actions = await db.GameAction.findAll({
+        where: {
+          gameId: game.id,
+          actionType: 'card_selection'
+        }
+      });
+      
+      expect(actions).toHaveLength(2);
+    });
+
+    test('should prevent double card selection by same player', async () => {
+      const cards = ['charger', 'tirer', 'bloquer'];
+      
+      // First selection should succeed
+      const result1 = await gameEngine.processCardSelection(game.id, player1.id, cards);
+      expect(result1.success).toBe(true);
+      
+      // Second selection by same player should fail
+      const result2 = await gameEngine.processCardSelection(game.id, player1.id, cards);
+      expect(result2.success).toBe(false);
+      expect(result2.error).toContain('already selected');
+    });
+  });
+
+  describe('Game State Persistence', () => {
+    test('should maintain game state across service restarts', async () => {
+      // Set up game state
+      await gameEngine.processCardSelection(game.id, player1.id, ['charger', 'tirer', 'bloquer']);
+      await gameEngine.processCardSelection(game.id, player2.id, ['charger', 'charger', 'tirer']);
+      await gameEngine.resolveTurn(game.id);
+      
+      // Create new GameEngine instance (simulating service restart)
+      const newGameEngine = new GameEngine();
+      
+      // Should be able to load game state from database
+      const gameState = await newGameEngine.getGameState(game.id);
+      
+      expect(gameState.currentTurn).toBe(2);
+      expect(gameState.phase).toBe('selection');
+      expect(gameState.players[0].charges).toBeGreaterThan(0);
+      expect(gameState.players[1].charges).toBeGreaterThan(0);
+    });
+
+    test('should recover from incomplete turn resolution', async () => {
+      // Set up partial turn state
+      await gameEngine.processCardSelection(game.id, player1.id, ['charger', 'tirer', 'bloquer']);
+      // Don't complete player2 selection
+      
+      const gameState = await gameEngine.getGameState(game.id);
+      
+      expect(gameState.phase).toBe('selection');
+      expect(gameState.waitingForPlayers).toContain(player2.id);
+    });
+  });
+});

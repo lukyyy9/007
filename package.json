@@ -10,7 +10,12 @@
     "install:all": "npm install && cd server && npm install && cd ../client && npm install",
     "verify": "node verify-setup.js"
   },
-  "keywords": ["card-game", "multiplayer", "react-native", "socket.io"],
+  "keywords": [
+    "card-game",
+    "multiplayer",
+    "react-native",
+    "socket.io"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {

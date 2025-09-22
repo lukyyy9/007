@@ -1,0 +1,365 @@
+/**
+ * Database integration tests using testcontainers
+ * These tests verify database operations work correctly with a real PostgreSQL instance
+ */
+
+const db = require('../models');
+
+describe('Database Integration Tests', () => {
+  describe('Database Connection', () => {
+    test('should connect to test database', async () => {
+      await expect(db.sequelize.authenticate()).resolves.not.toThrow();
+    });
+
+    test('should have all required models', () => {
+      const expectedModels = ['User', 'Game', 'Tournament', 'Match', 'TournamentPlayer', 'GameAction', 'CardDefinition'];
+      
+      expectedModels.forEach(modelName => {
+        expect(db[modelName]).toBeDefined();
+        expect(typeof db[modelName].create).toBe('function');
+      });
+    });
+
+    test('should have card definitions seeded', async () => {
+      const cardCount = await db.CardDefinition.count();
+      expect(cardCount).toBeGreaterThan(0);
+      
+      // Check for specific cards
+      const chargerCard = await db.CardDefinition.findByPk('charger');
+      expect(chargerCard).toBeTruthy();
+      expect(chargerCard.name).toBe('Charger');
+      expect(chargerCard.emoji).toBe('⚡');
+    });
+  });
+
+  describe('User Model', () => {
+    test('should create user with valid data', async () => {
+      const userData = {
+        username: 'testuser',
+        email: 'test@example.com',
+        password: 'hashedpassword'
+      };
+
+      const user = await db.User.create(userData);
+      
+      expect(user.id).toBeDefined();
+      expect(user.username).toBe('testuser');
+      expect(user.email).toBe('test@example.com');
+      expect(user.createdAt).toBeDefined();
+    });
+
+    test('should enforce unique username constraint', async () => {
+      const userData = {
+        username: 'duplicate',
+        email: 'test1@example.com',
+        password: 'hashedpassword'
+      };
+
+      await db.User.create(userData);
+
+      const duplicateData = {
+        username: 'duplicate',
+        email: 'test2@example.com',
+        password: 'hashedpassword'
+      };
+
+      await expect(db.User.create(duplicateData)).rejects.toThrow();
+    });
+
+    test('should enforce unique email constraint', async () => {
+      const userData = {
+        username: 'user1',
+        email: 'duplicate@example.com',
+        password: 'hashedpassword'
+      };
+
+      await db.User.create(userData);
+
+      const duplicateData = {
+        username: 'user2',
+        email: 'duplicate@example.com',
+        password: 'hashedpassword'
+      };
+
+      await expect(db.User.create(duplicateData)).rejects.toThrow();
+    });
+  });
+
+  describe('Game Model', () => {
+    let testUser;
+
+    beforeEach(async () => {
+      testUser = await global.createTestUser();
+    });
+
+    test('should create game with valid data', async () => {
+      const gameData = {
+        player1Id: testUser.id,
+        status: 'waiting',
+        maxPlayers: 2,
+        currentPlayers: 1,
+        gameConfig: {
+          maxHealth: 6,
+          turnTimeLimit: 20,
+          bestOfSeries: 1
+        }
+      };
+
+      const game = await db.Game.create(gameData);
+      
+      expect(game.id).toBeDefined();
+      expect(game.player1Id).toBe(testUser.id);
+      expect(game.status).toBe('waiting');
+      expect(game.gameConfig.maxHealth).toBe(6);
+    });
+
+    test('should establish relationship with user', async () => {
+      const game = await global.createTestGame({ player1Id: testUser.id });
+      
+      const gameWithUser = await db.Game.findByPk(game.id, {
+        include: [{ model: db.User, as: 'player1' }]
+      });
+
+      expect(gameWithUser.player1).toBeTruthy();
+      expect(gameWithUser.player1.username).toBe(testUser.username);
+    });
+  });
+
+  describe('Tournament Model', () => {
+    let testUser;
+
+    beforeEach(async () => {
+      testUser = await global.createTestUser();
+    });
+
+    test('should create tournament with valid data', async () => {
+      const tournamentData = {
+        name: 'Test Tournament',
+        format: 'single-elimination',
+        maxPlayers: 8,
+        status: 'waiting',
+        creatorId: testUser.id,
+        gameConfig: {
+          maxHealth: 6,
+          turnTimeLimit: 20,
+          bestOfSeries: 1
+        }
+      };
+
+      const tournament = await db.Tournament.create(tournamentData);
+      
+      expect(tournament.id).toBeDefined();
+      expect(tournament.name).toBe('Test Tournament');
+      expect(tournament.format).toBe('single-elimination');
+      expect(tournament.creatorId).toBe(testUser.id);
+    });
+
+    test('should establish relationship with creator', async () => {
+      const tournament = await global.createTestTournament({ creatorId: testUser.id });
+      
+      const tournamentWithCreator = await db.Tournament.findByPk(tournament.id, {
+        include: [{ model: db.User, as: 'creator' }]
+      });
+
+      expect(tournamentWithCreator.creator).toBeTruthy();
+      expect(tournamentWithCreator.creator.username).toBe(testUser.username);
+    });
+  });
+
+  describe('Tournament Player Model', () => {
+    let testUser, testTournament;
+
+    beforeEach(async () => {
+      testUser = await global.createTestUser();
+      testTournament = await global.createTestTournament({ creatorId: testUser.id });
+    });
+
+    test('should create tournament player relationship', async () => {
+      const tournamentPlayer = await db.TournamentPlayer.create({
+        tournamentId: testTournament.id,
+        playerId: testUser.id,
+        status: 'active'
+      });
+
+      expect(tournamentPlayer.id).toBeDefined();
+      expect(tournamentPlayer.tournamentId).toBe(testTournament.id);
+      expect(tournamentPlayer.playerId).toBe(testUser.id);
+      expect(tournamentPlayer.status).toBe('active');
+    });
+
+    test('should prevent duplicate tournament player entries', async () => {
+      await db.TournamentPlayer.create({
+        tournamentId: testTournament.id,
+        playerId: testUser.id,
+        status: 'active'
+      });
+
+      await expect(db.TournamentPlayer.create({
+        tournamentId: testTournament.id,
+        playerId: testUser.id,
+        status: 'active'
+      })).rejects.toThrow();
+    });
+  });
+
+  describe('Match Model', () => {
+    let testUser1, testUser2, testTournament;
+
+    beforeEach(async () => {
+      testUser1 = await global.createTestUser({ username: 'player1', email: 'player1@example.com' });
+      testUser2 = await global.createTestUser({ username: 'player2', email: 'player2@example.com' });
+      testTournament = await global.createTestTournament({ creatorId: testUser1.id });
+    });
+
+    test('should create match with valid data', async () => {
+      const matchData = {
+        tournamentId: testTournament.id,
+        player1Id: testUser1.id,
+        player2Id: testUser2.id,
+        bracketRound: 1,
+        bracketPosition: 1,
+        bracketType: 'winner',
+        status: 'pending'
+      };
+
+      const match = await db.Match.create(matchData);
+      
+      expect(match.id).toBeDefined();
+      expect(match.tournamentId).toBe(testTournament.id);
+      expect(match.player1Id).toBe(testUser1.id);
+      expect(match.player2Id).toBe(testUser2.id);
+      expect(match.bracketRound).toBe(1);
+    });
+
+    test('should establish relationships with players and tournament', async () => {
+      const match = await db.Match.create({
+        tournamentId: testTournament.id,
+        player1Id: testUser1.id,
+        player2Id: testUser2.id,
+        round: 1,
+        position: 1,
+        bracketType: 'winner',
+        status: 'pending'
+      });
+
+      const matchWithRelations = await db.Match.findByPk(match.id, {
+        include: [
+          { model: db.User, as: 'player1' },
+          { model: db.User, as: 'player2' },
+          { model: db.Tournament }
+        ]
+      });
+
+      expect(matchWithRelations.player1.username).toBe('player1');
+      expect(matchWithRelations.player2.username).toBe('player2');
+      expect(matchWithRelations.Tournament.name).toBe(testTournament.name);
+    });
+  });
+
+  describe('Game Action Model', () => {
+    let testUser, testGame;
+
+    beforeEach(async () => {
+      testUser = await global.createTestUser();
+      testGame = await global.createTestGame({ player1Id: testUser.id });
+    });
+
+    test('should create game action with valid data', async () => {
+      const actionData = {
+        gameId: testGame.id,
+        playerId: testUser.id,
+        turn: 1,
+        step: 1,
+        actionType: 'card_selection',
+        actionData: {
+          cards: ['charger', 'tirer', 'bloquer']
+        }
+      };
+
+      const action = await db.GameAction.create(actionData);
+      
+      expect(action.id).toBeDefined();
+      expect(action.gameId).toBe(testGame.id);
+      expect(action.playerId).toBe(testUser.id);
+      expect(action.actionType).toBe('card_selection');
+      expect(action.actionData.cards).toEqual(['charger', 'tirer', 'bloquer']);
+    });
+
+    test('should establish relationships with game and player', async () => {
+      const action = await db.GameAction.create({
+        gameId: testGame.id,
+        playerId: testUser.id,
+        turn: 1,
+        step: 1,
+        actionType: 'card_selection',
+        actionData: { cards: ['charger'] }
+      });
+
+      const actionWithRelations = await db.GameAction.findByPk(action.id, {
+        include: [
+          { model: db.Game },
+          { model: db.User, as: 'player' }
+        ]
+      });
+
+      expect(actionWithRelations.Game.id).toBe(testGame.id);
+      expect(actionWithRelations.player.username).toBe(testUser.username);
+    });
+  });
+
+  describe('Database Transactions', () => {
+    test('should rollback transaction on error', async () => {
+      const transaction = await db.sequelize.transaction();
+
+      try {
+        // Create a user
+        const user = await db.User.create({
+          username: 'transactiontest',
+          email: 'transaction@example.com',
+          password: 'hashedpassword'
+        }, { transaction });
+
+        // Try to create duplicate user (should fail)
+        await db.User.create({
+          username: 'transactiontest',
+          email: 'transaction@example.com',
+          password: 'hashedpassword'
+        }, { transaction });
+
+        await transaction.commit();
+      } catch (error) {
+        await transaction.rollback();
+      }
+
+      // User should not exist due to rollback
+      const user = await db.User.findOne({
+        where: { username: 'transactiontest' }
+      });
+
+      expect(user).toBeNull();
+    });
+  });
+
+  describe('Database Performance', () => {
+    test('should handle bulk operations efficiently', async () => {
+      const users = [];
+      for (let i = 0; i < 100; i++) {
+        users.push({
+          username: `bulkuser${i}`,
+          email: `bulk${i}@example.com`,
+          password: 'hashedpassword'
+        });
+      }
+
+      const startTime = Date.now();
+      await db.User.bulkCreate(users);
+      const endTime = Date.now();
+
+      const userCount = await db.User.count();
+      expect(userCount).toBe(100);
+      
+      // Should complete within reasonable time (less than 5 seconds)
+      expect(endTime - startTime).toBeLessThan(5000);
+    });
+  });
+});

@@ -503,7 +503,7 @@ class GameHandlers {
    * Setup turn timers for active games
    */
   setupTurnTimers() {
-    setInterval(() => {
+    this.turnTimerInterval = setInterval(() => {
       for (const [gameId, game] of gameEngine.activeGames.entries()) {
         if (game.phase === 'selection' && game.turnTimer && Date.now() > game.turnTimer) {
           console.log(`Turn timeout for game ${gameId}`);
@@ -527,6 +527,16 @@ class GameHandlers {
         }
       }
     }, 1000); // Check every second
+  }
+
+  /**
+   * Cleanup timers and resources
+   */
+  cleanup() {
+    if (this.turnTimerInterval) {
+      clearInterval(this.turnTimerInterval);
+      this.turnTimerInterval = null;
+    }
   }
 }
 

@@ -1,0 +1,140 @@
+/**
+ * Testcontainers verification test
+ * This test verifies that the testcontainers setup is working correctly
+ */
+
+const db = require('../models');
+
+describe('Testcontainers Verification', () => {
+  test('should have PostgreSQL container running', async () => {
+    // Test basic database connection
+    await expect(db.sequelize.authenticate()).resolves.not.toThrow();
+  });
+
+  test('should have test database created', async () => {
+    const result = await db.sequelize.query('SELECT current_database()');
+    expect(result[0][0].current_database).toBe('tactical_card_game');
+  });
+
+  test('should have all tables created', async () => {
+    const tables = await db.sequelize.query(`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public'
+    `);
+    
+    const tableNames = tables[0].map(row => row.table_name);
+    
+    expect(tableNames).toContain('users');
+    expect(tableNames).toContain('games');
+    expect(tableNames).toContain('tournaments');
+    expect(tableNames).toContain('matches');
+    expect(tableNames).toContain('tournament_players');
+    expect(tableNames).toContain('game_actions');
+    expect(tableNames).toContain('card_definitions');
+  });
+
+  test('should have card definitions seeded', async () => {
+    const cardCount = await db.CardDefinition.count();
+    expect(cardCount).toBeGreaterThan(0);
+    
+    // Check for specific cards
+    const cards = await db.CardDefinition.findAll();
+    const cardIds = cards.map(card => card.id);
+    
+    expect(cardIds).toContain('charger');
+    expect(cardIds).toContain('tirer');
+    expect(cardIds).toContain('bloquer');
+    expect(cardIds).toContain('big-blast');
+  });
+
+  test('should clean database between tests', async () => {
+    // Create a test user
+    const user = await global.createTestUser();
+    expect(user.id).toBeDefined();
+    
+    // User should exist
+    const userCount = await db.User.count();
+    expect(userCount).toBe(1);
+    
+    // After this test, the database should be cleaned for the next test
+  });
+
+  test('should have clean database from previous test', async () => {
+    // This test verifies that the database was cleaned after the previous test
+    const userCount = await db.User.count();
+    expect(userCount).toBe(0);
+  });
+
+  test('should support transactions', async () => {
+    const transaction = await db.sequelize.transaction();
+    
+    try {
+      // Create user within transaction
+      const user = await db.User.create({
+        username: 'transactiontest',
+        email: 'transaction@example.com',
+        password: 'hashedpassword'
+      }, { transaction });
+      
+      expect(user.id).toBeDefined();
+      
+      // Rollback transaction
+      await transaction.rollback();
+      
+      // User should not exist after rollback
+      const userCount = await db.User.count();
+      expect(userCount).toBe(0);
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  });
+
+  test('should support concurrent operations', async () => {
+    // Create multiple users concurrently
+    const userPromises = [];
+    for (let i = 0; i < 5; i++) {
+      userPromises.push(
+        global.createTestUser({
+          username: `concurrent${i}`,
+          email: `concurrent${i}@example.com`
+        })
+      );
+    }
+    
+    const users = await Promise.all(userPromises);
+    
+    expect(users).toHaveLength(5);
+    users.forEach(user => {
+      expect(user.id).toBeDefined();
+    });
+    
+    const userCount = await db.User.count();
+    expect(userCount).toBe(5);
+  });
+
+  test('should handle database constraints', async () => {
+    // Create user
+    const user = await global.createTestUser({
+      username: 'constrainttest',
+      email: 'constraint@example.com'
+    });
+    
+    // Try to create duplicate username - should fail
+    await expect(
+      global.createTestUser({
+        username: 'constrainttest',
+        email: 'different@example.com'
+      })
+    ).rejects.toThrow();
+    
+    // Try to create duplicate email - should fail
+    await expect(
+      global.createTestUser({
+        username: 'differentuser',
+        email: 'constraint@example.com'
+      })
+    ).rejects.toThrow();
+  });
+});

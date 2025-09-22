@@ -233,28 +233,37 @@ const ErrorResponse = {
 ## Testing Strategy
 
 ### Unit Testing
-- **Card Logic**: Test all card effects and interactions
-- **Game Rules**: Validate win conditions and turn resolution
-- **Tournament Logic**: Test bracket generation and advancement
+- **Card Logic**: Test all card effects and interactions using isolated unit tests
+- **Game Rules**: Validate win conditions and turn resolution logic
+- **Tournament Logic**: Test bracket generation and advancement algorithms
 - **Data Models**: Validate model constraints and relationships
 
-### Integration Testing
-- **API Endpoints**: Test all REST API functionality
-- **WebSocket Events**: Validate real-time communication
-- **Database Operations**: Test CRUD operations and transactions
-- **Authentication**: Verify JWT token handling
+### Integration Testing with Testcontainers
+- **Database Operations**: Test CRUD operations and transactions using real PostgreSQL containers
+- **Game Engine Integration**: Test complete game flows with database persistence
+- **API Endpoints**: Test all REST API functionality with containerized database
+- **WebSocket Events**: Validate real-time communication with database state
+- **Authentication**: Verify JWT token handling and user persistence
+
+### Database Testing Infrastructure
+- **Testcontainers**: Automated PostgreSQL container management for tests
+- **Isolated Test Environment**: Each test suite runs with fresh database state
+- **Real Database Operations**: Tests use actual PostgreSQL instead of mocks
+- **Transaction Testing**: Verify database transaction handling and rollbacks
+- **Concurrent Access**: Test database locking and concurrent game operations
 
 ### End-to-End Testing
-- **Complete Game Flow**: Full 1v1 match from start to finish
-- **Tournament Flow**: Multi-player tournament completion
+- **Complete Game Flow**: Full 1v1 match from start to finish with database persistence
+- **Tournament Flow**: Multi-player tournament completion with bracket updates
 - **Mobile UI**: Touch interactions and responsive design
-- **Real-time Sync**: Multi-client synchronization testing
+- **Real-time Sync**: Multi-client synchronization testing with database state
 
 ### Performance Testing
-- **Concurrent Games**: Test multiple simultaneous matches
-- **Tournament Scale**: Large tournament with many players
-- **WebSocket Load**: High-frequency message handling
-- **Database Performance**: Query optimization under load
+- **Concurrent Games**: Test multiple simultaneous matches with database load
+- **Tournament Scale**: Large tournament with many players and database operations
+- **WebSocket Load**: High-frequency message handling with database updates
+- **Database Performance**: Query optimization and connection pooling under load
+- **Container Performance**: Testcontainer startup and teardown optimization
 
 ## Security Considerations
 

@@ -1,38 +1,22 @@
 const express = require('express');
 const { Tournament, TournamentPlayer, User, Match } = require('../models');
 const { auth, validation } = require('../middleware');
+const { TournamentManager } = require('../services');
 const router = express.Router();
+
+const tournamentManager = new TournamentManager();
 
 // Create a new tournament
 router.post('/create', auth.authenticateToken, validation.validateTournamentCreation, async (req, res) => {
   try {
     const { name, format, maxPlayers, gameConfig = {} } = req.body;
     
-    const defaultGameConfig = {
-      maxHealth: 6,
-      turnTimeLimit: 20,
-      bestOfSeries: 1
-    };
-
-    const finalGameConfig = { ...defaultGameConfig, ...gameConfig };
-
-    const tournament = await Tournament.create({
+    const tournament = await tournamentManager.createTournament({
       name,
       format,
       maxPlayers,
       creatorId: req.user.id,
-      status: 'waiting',
-      gameConfig: finalGameConfig,
-      brackets: [],
-      currentRound: 0
-    });
-
-    // Automatically add creator as first participant
-    await TournamentPlayer.create({
-      tournamentId: tournament.id,
-      playerId: req.user.id,
-      status: 'active',
-      joinedAt: new Date()
+      gameConfig
     });
 
     // Include creator information
@@ -53,7 +37,7 @@ router.post('/create', auth.authenticateToken, validation.validateTournamentCrea
   } catch (error) {
     console.error('Tournament creation error:', error);
     res.status(500).json({
-      error: 'Failed to create tournament',
+      error: error.message || 'Failed to create tournament',
       code: 'TOURNAMENT_CREATION_ERROR'
     });
   }
@@ -64,56 +48,10 @@ router.post('/join/:tournamentId', auth.authenticateToken, validation.validateTo
   try {
     const { tournamentId } = req.params;
 
+    await tournamentManager.addPlayer(tournamentId, req.user.id);
+
+    // Get updated tournament information
     const tournament = await Tournament.findByPk(tournamentId, {
-      include: [
-        { 
-          model: TournamentPlayer, 
-          include: [{ model: User, as: 'player', attributes: ['id', 'username'] }]
-        }
-      ]
-    });
-
-    if (!tournament) {
-      return res.status(404).json({
-        error: 'Tournament not found',
-        code: 'TOURNAMENT_NOT_FOUND'
-      });
-    }
-
-    if (tournament.status !== 'waiting') {
-      return res.status(400).json({
-        error: 'Tournament is not accepting new players',
-        code: 'TOURNAMENT_NOT_JOINABLE'
-      });
-    }
-
-    // Check if user is already in tournament
-    const existingPlayer = tournament.TournamentPlayers.find(tp => tp.playerId === req.user.id);
-    if (existingPlayer) {
-      return res.status(400).json({
-        error: 'Already joined this tournament',
-        code: 'ALREADY_JOINED'
-      });
-    }
-
-    // Check if tournament is full
-    if (tournament.TournamentPlayers.length >= tournament.maxPlayers) {
-      return res.status(400).json({
-        error: 'Tournament is full',
-        code: 'TOURNAMENT_FULL'
-      });
-    }
-
-    // Join the tournament
-    await TournamentPlayer.create({
-      tournamentId: tournament.id,
-      playerId: req.user.id,
-      status: 'active',
-      joinedAt: new Date()
-    });
-
-    // Reload with updated player information
-    await tournament.reload({
       include: [
         { model: User, as: 'creator', attributes: ['id', 'username'] },
         { 
@@ -130,7 +68,7 @@ router.post('/join/:tournamentId', auth.authenticateToken, validation.validateTo
   } catch (error) {
     console.error('Tournament join error:', error);
     res.status(500).json({
-      error: 'Failed to join tournament',
+      error: error.message || 'Failed to join tournament',
       code: 'TOURNAMENT_JOIN_ERROR'
     });
   }
@@ -281,71 +219,22 @@ router.post('/:tournamentId/start', auth.authenticateToken, validation.validateU
   try {
     const { tournamentId } = req.params;
 
-    const tournament = await Tournament.findByPk(tournamentId, {
-      include: [
-        { 
-          model: TournamentPlayer, 
-          include: [{ model: User, as: 'player', attributes: ['id', 'username'] }]
-        }
-      ]
-    });
-
-    if (!tournament) {
-      return res.status(404).json({
-        error: 'Tournament not found',
-        code: 'TOURNAMENT_NOT_FOUND'
-      });
-    }
-
-    if (tournament.creatorId !== req.user.id) {
-      return res.status(403).json({
-        error: 'Only tournament creator can start the tournament',
-        code: 'ACCESS_DENIED'
-      });
-    }
-
-    if (tournament.status !== 'waiting') {
-      return res.status(400).json({
-        error: 'Tournament cannot be started',
-        code: 'TOURNAMENT_NOT_STARTABLE'
-      });
-    }
-
-    const playerCount = tournament.TournamentPlayers.length;
-    if (playerCount < 4) {
-      return res.status(400).json({
-        error: 'Tournament needs at least 4 players to start',
-        code: 'INSUFFICIENT_PLAYERS'
-      });
-    }
-
-    // Check if player count is a power of 2
-    if ((playerCount & (playerCount - 1)) !== 0) {
-      return res.status(400).json({
-        error: 'Tournament requires a power of 2 number of players (4, 8, 16, 32, etc.)',
-        code: 'INVALID_PLAYER_COUNT'
-      });
-    }
-
-    await tournament.update({
-      status: 'active',
-      startedAt: new Date(),
-      currentRound: 1
-    });
+    const result = await tournamentManager.startTournament(tournamentId, req.user.id);
 
     res.json({
       message: 'Tournament started successfully',
       tournament: {
-        id: tournament.id,
-        name: tournament.name,
-        status: tournament.status,
-        playerCount
-      }
+        id: result.tournament.id,
+        name: result.tournament.name,
+        status: result.tournament.status,
+        playerCount: result.playerCount
+      },
+      brackets: result.brackets
     });
   } catch (error) {
     console.error('Tournament start error:', error);
     res.status(500).json({
-      error: 'Failed to start tournament',
+      error: error.message || 'Failed to start tournament',
       code: 'TOURNAMENT_START_ERROR'
     });
   }

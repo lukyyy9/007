@@ -208,6 +208,13 @@ describe('Socket Handlers', () => {
             socketHandler = new SocketHandler(mockIo);
         });
 
+        afterEach(() => {
+            // Clean up any timers
+            if (socketHandler && socketHandler.gameHandlers) {
+                socketHandler.gameHandlers.cleanup();
+            }
+        });
+
         test('should initialize correctly', () => {
             expect(socketHandler.io).toBe(mockIo);
             expect(socketHandler.gameHandlers).toBeDefined();

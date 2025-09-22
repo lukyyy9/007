@@ -1,68 +1,157 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
+import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 
-// Import screens when they are created
-// import LobbyScreen from './src/screens/LobbyScreen';
-// import GameRoomScreen from './src/screens/GameRoomScreen';
-// import GameBoardScreen from './src/screens/GameBoardScreen';
-// import ProfileScreen from './src/screens/ProfileScreen';
+// Context Providers
+import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { GameProvider } from './src/context/GameContext';
+import { TournamentProvider } from './src/context/TournamentContext';
+import { SocketProvider } from './src/context/SocketContext';
+
+// Screen imports
+import {
+  LobbyScreen,
+  GameRoomScreen,
+  GameBoardScreen,
+  ProfileScreen,
+  LoginScreen,
+  RegisterScreen,
+} from './src/screens';
 
 const Stack = createStackNavigator();
+const Tab = createBottomTabNavigator();
 
-// Placeholder component for development
-const PlaceholderScreen = ({ route }) => {
-  const { View, Text, StyleSheet } = require('react-native');
-  return (
-    <View style={styles.container}>
-      <Text style={styles.text}>
-        {route.params?.title || 'Screen'} - Coming Soon
-      </Text>
-    </View>
-  );
-};
+// Loading component
+const LoadingScreen = () => (
+  <View style={styles.loadingContainer}>
+    <ActivityIndicator size="large" color="#007AFF" />
+    <Text style={styles.loadingText}>Loading...</Text>
+  </View>
+);
 
-const styles = require('react-native').StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f0f0f0',
-  },
-  text: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-});
+// Authentication Stack Navigator
+const AuthStack = () => (
+  <Stack.Navigator 
+    initialRouteName="Login"
+    screenOptions={{
+      headerShown: false,
+    }}
+  >
+    <Stack.Screen name="Login" component={LoginScreen} />
+    <Stack.Screen name="Register" component={RegisterScreen} />
+  </Stack.Navigator>
+);
 
-export default function App() {
+// Main Tab Navigator for authenticated users
+const MainTabs = () => (
+  <Tab.Navigator
+    screenOptions={{
+      tabBarActiveTintColor: '#007AFF',
+      tabBarInactiveTintColor: '#666',
+      tabBarStyle: {
+        backgroundColor: 'white',
+        borderTopWidth: 1,
+        borderTopColor: '#eee',
+      },
+    }}
+  >
+    <Tab.Screen 
+      name="Lobby" 
+      component={LobbyScreen}
+      options={{
+        title: 'Tactical Card Game',
+        tabBarLabel: 'Lobby',
+        tabBarIcon: ({ color }) => (
+          <Text style={{ color, fontSize: 20 }}>🏠</Text>
+        ),
+      }}
+    />
+    <Tab.Screen 
+      name="Profile" 
+      component={ProfileScreen}
+      options={{
+        title: 'Profile',
+        tabBarLabel: 'Profile',
+        tabBarIcon: ({ color }) => (
+          <Text style={{ color, fontSize: 20 }}>👤</Text>
+        ),
+      }}
+    />
+  </Tab.Navigator>
+);
+
+// Game Stack Navigator (for game-related screens)
+const GameStack = () => (
+  <Stack.Navigator>
+    <Stack.Screen 
+      name="MainTabs" 
+      component={MainTabs}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen 
+      name="GameRoom" 
+      component={GameRoomScreen}
+      options={{ 
+        title: 'Game Room',
+        headerBackTitle: 'Lobby',
+      }}
+    />
+    <Stack.Screen 
+      name="GameBoard" 
+      component={GameBoardScreen}
+      options={{ 
+        title: 'Game Board',
+        headerBackTitle: 'Room',
+        headerLeft: null, // Prevent back navigation during game
+      }}
+    />
+  </Stack.Navigator>
+);
+
+// Main App Navigator
+const AppNavigator = () => {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
   return (
     <NavigationContainer>
       <StatusBar style="auto" />
-      <Stack.Navigator initialRouteName="Lobby">
-        <Stack.Screen 
-          name="Lobby" 
-          component={PlaceholderScreen}
-          initialParams={{ title: 'Lobby' }}
-          options={{ title: 'Tactical Card Game' }}
-        />
-        <Stack.Screen 
-          name="GameRoom" 
-          component={PlaceholderScreen}
-          initialParams={{ title: 'Game Room' }}
-        />
-        <Stack.Screen 
-          name="GameBoard" 
-          component={PlaceholderScreen}
-          initialParams={{ title: 'Game Board' }}
-        />
-        <Stack.Screen 
-          name="Profile" 
-          component={PlaceholderScreen}
-          initialParams={{ title: 'Profile' }}
-        />
-      </Stack.Navigator>
+      {isAuthenticated ? <GameStack /> : <AuthStack />}
     </NavigationContainer>
   );
+};
+
+// Main App Component with Providers
+export default function App() {
+  return (
+    <AuthProvider>
+      <SocketProvider>
+        <GameProvider>
+          <TournamentProvider>
+            <AppNavigator />
+          </TournamentProvider>
+        </GameProvider>
+      </SocketProvider>
+    </AuthProvider>
+  );
 }
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+});

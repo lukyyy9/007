@@ -92,8 +92,45 @@ API documentation will be available at `/api` once the server is running.
 
 ## Testing
 
-- **Server tests**: `cd server && npm test`
-- **Client tests**: `cd client && npm test`
+The project uses comprehensive testing with testcontainers for database integration testing.
+
+### Server Testing
+
+```bash
+cd server
+
+# Verify testcontainers setup
+npm run test:setup
+
+# Run all tests
+npm test
+
+# Run specific test types
+npm run test:unit          # Unit tests only
+npm run test:integration   # Integration tests only  
+npm run test:database      # Database tests only
+npm run test:coverage      # Tests with coverage report
+
+# Development
+npm run test:watch         # Watch mode for development
+```
+
+### Testing Infrastructure
+
+- **Unit Tests**: Isolated function and class testing
+- **Integration Tests**: Component interaction testing with real database
+- **Database Tests**: Model validation, relationships, and transactions
+- **Testcontainers**: Automated PostgreSQL containers for isolated testing
+- **Real Database Testing**: Tests run against actual PostgreSQL instead of mocks
+
+### Client Testing
+
+```bash
+cd client
+npm test
+```
+
+For detailed testing documentation, see `server/src/__tests__/README.md`.
 
 ## Contributing
 

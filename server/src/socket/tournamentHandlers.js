@@ -1,4 +1,5 @@
 const { Tournament, TournamentPlayer, Match, User } = require('../models');
+const { TournamentManager } = require('../services');
 
 /**
  * Tournament-related Socket.IO event handlers
@@ -7,6 +8,7 @@ class TournamentHandlers {
   constructor(io) {
     this.io = io;
     this.tournamentRooms = new Map(); // tournamentId -> Set of socketIds
+    this.tournamentManager = new TournamentManager();
   }
 
   /**
@@ -246,21 +248,15 @@ class TournamentHandlers {
         return;
       }
 
-      // Start tournament
-      await tournament.update({
-        status: 'active',
-        startedAt: new Date(),
-        currentRound: 1
-      });
-
-      // Generate initial brackets
-      const brackets = await this.generateInitialBrackets(tournamentId, tournament.TournamentPlayers, tournament.format);
+      // Start tournament using TournamentManager
+      const result = await this.tournamentManager.startTournament(tournamentId, userId);
+      const brackets = await this.tournamentManager.getBrackets(tournamentId);
 
       // Broadcast tournament start to all participants
       this.broadcastToTournament(tournamentId, 'tournament:started', {
         tournamentId,
         brackets,
-        playerCount
+        playerCount: result.playerCount
       });
 
       console.log(`Tournament ${tournamentId} started by user ${userId}`);
@@ -275,66 +271,40 @@ class TournamentHandlers {
    */
   async handleMatchComplete(matchId, winnerId) {
     try {
-      const match = await Match.findByPk(matchId, {
-        include: [{ model: Tournament }]
-      });
-
-      if (!match) {
-        console.error('Match not found:', matchId);
-        return;
-      }
-
-      const tournamentId = match.tournamentId;
+      // Use TournamentManager to process match result
+      const result = await this.tournamentManager.processMatchResult(matchId, winnerId);
       
-      // Update match with winner
-      await match.update({
-        winnerId,
-        status: 'completed',
-        completedAt: new Date()
-      });
-
-      // Check if this completes a round
-      const tournament = await Tournament.findByPk(tournamentId);
-      const roundMatches = await Match.findAll({
-        where: {
-          tournamentId,
-          round: tournament.currentRound,
-          bracketType: 'winner'
-        }
-      });
-
-      const completedMatches = roundMatches.filter(m => m.status === 'completed');
-      
-      if (completedMatches.length === roundMatches.length) {
-        // Round completed, advance to next round or end tournament
-        await this.advanceToNextRound(tournamentId);
-      }
+      const tournamentId = result.tournamentId;
 
       // Broadcast match result
       this.broadcastToTournament(tournamentId, 'tournament:match-completed', {
-        matchId,
-        winnerId,
+        matchId: result.matchId,
+        winnerId: result.winnerId,
+        loserId: result.loserId,
         tournamentId
       });
 
-      // Get updated brackets
-      const matches = await Match.findAll({
-        where: { tournamentId },
-        include: [
-          { model: User, as: 'player1', attributes: ['id', 'username'] },
-          { model: User, as: 'player2', attributes: ['id', 'username'] },
-          { model: User, as: 'winner', attributes: ['id', 'username'] }
-        ],
-        order: [['round', 'ASC'], ['position', 'ASC']]
-      });
-
-      const brackets = this.formatBrackets(matches, tournament.format);
+      // Get updated brackets and tournament status
+      const brackets = await this.tournamentManager.getBrackets(tournamentId);
+      const tournamentStatus = await this.tournamentManager.getTournamentStatus(tournamentId);
 
       this.broadcastToTournament(tournamentId, 'tournament:brackets-update', {
         tournamentId,
         brackets,
-        currentRound: tournament.currentRound
+        currentRound: tournamentStatus.currentRound,
+        status: tournamentStatus.status
       });
+
+      // If tournament is completed, broadcast final results
+      if (tournamentStatus.status === 'completed') {
+        const finalRankings = await this.tournamentManager.calculateFinalRankings(tournamentId);
+        
+        this.broadcastToTournament(tournamentId, 'tournament:completed', {
+          tournamentId,
+          winnerId: tournamentStatus.winner?.id,
+          finalRankings
+        });
+      }
 
     } catch (error) {
       console.error('Match completion error:', error);
