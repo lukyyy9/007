@@ -21,12 +21,12 @@ const LobbyScreen = ({ onNavigateToGame, onNavigateToTournament, onNavigateToPro
     const loadDataAsync = async () => {
       setIsLoading(true);
       try {
-        const [games, tournaments] = await Promise.all([
-          gameAPI.getAvailableGames().catch(() => []),
-          tournamentAPI.getAvailableTournaments().catch(() => [])
+        const [gamesResponse, tournamentsResponse] = await Promise.all([
+          gameAPI.getAvailableGames().catch(() => ({ games: [] })),
+          tournamentAPI.getAvailableTournaments().catch(() => ({ tournaments: [] }))
         ]);
-        setAvailableGames(games);
-        setAvailableTournaments(tournaments);
+        setAvailableGames(gamesResponse.games || []);
+        setAvailableTournaments(tournamentsResponse.tournaments || []);
       } catch {
         setError('Erreur lors du chargement des données');
       } finally {
@@ -40,12 +40,12 @@ const LobbyScreen = ({ onNavigateToGame, onNavigateToTournament, onNavigateToPro
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [games, tournaments] = await Promise.all([
-        gameAPI.getAvailableGames().catch(() => []),
-        tournamentAPI.getAvailableTournaments().catch(() => [])
+      const [gamesResponse, tournamentsResponse] = await Promise.all([
+        gameAPI.getAvailableGames().catch(() => ({ games: [] })),
+        tournamentAPI.getAvailableTournaments().catch(() => ({ tournaments: [] }))
       ]);
-      setAvailableGames(games);
-      setAvailableTournaments(tournaments);
+      setAvailableGames(gamesResponse.games || []);
+      setAvailableTournaments(tournamentsResponse.tournaments || []);
     } catch (err) {
       setError('Erreur lors du chargement des données');
     } finally {

@@ -109,7 +109,7 @@ class GameAPI {
     }
 
     try {
-      const response = await this.request(`/api/game/${gameId}/leave`, {
+      const response = await this.request(`${API_CONFIG.ENDPOINTS.GAME.LEAVE}/${gameId}/leave`, {
         method: 'POST',
       });
 
@@ -125,7 +125,7 @@ class GameAPI {
    */
   async getAvailableGames() {
     try {
-      const response = await this.request('/api/game/available', {
+      const response = await this.request(API_CONFIG.ENDPOINTS.GAME.LIST, {
         method: 'GET',
       });
 
@@ -141,7 +141,7 @@ class GameAPI {
    */
   async getGameHistory() {
     try {
-      const response = await this.request('/api/game/history', {
+      const response = await this.request(API_CONFIG.ENDPOINTS.GAME.HISTORY, {
         method: 'GET',
       });
 
