@@ -1,0 +1,137 @@
+.register-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+}
+
+.register-screen__container {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  padding: 40px;
+  width: 100%;
+  max-width: 450px;
+}
+
+.register-screen__header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.register-screen__title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #343a40;
+  margin: 0 0 8px 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.register-screen__subtitle {
+  color: #6c757d;
+  margin: 0;
+  font-size: 1rem;
+}
+
+.register-screen__form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.register-screen__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.register-screen__label {
+  font-weight: 600;
+  color: #495057;
+  font-size: 0.875rem;
+}
+
+.register-screen__input {
+  padding: 12px 16px;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  background: #fff;
+}
+
+.register-screen__input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.register-screen__input:disabled {
+  background: #f8f9fa;
+  cursor: not-allowed;
+}
+
+.register-screen__input::placeholder {
+  color: #adb5bd;
+}
+
+.register-screen__submit {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.register-screen__error {
+  background: #ffe6e6;
+  color: #c92a2a;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid #ffb3b3;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.register-screen__footer {
+  margin-top: 24px;
+  text-align: center;
+}
+
+.register-screen__switch {
+  color: #6c757d;
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.register-screen__link {
+  background: none;
+  border: none;
+  color: #667eea;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: inherit;
+  font-weight: 600;
+}
+
+.register-screen__link:hover:not(:disabled) {
+  color: #764ba2;
+}
+
+.register-screen__link:disabled {
+  color: #adb5bd;
+  cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+  .register-screen__container {
+    padding: 24px;
+    margin: 20px;
+  }
+  
+  .register-screen__title {
+    font-size: 1.75rem;
+  }
+}
