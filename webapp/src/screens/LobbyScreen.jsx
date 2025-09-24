@@ -87,11 +87,11 @@ const LobbyScreen = ({ onNavigateToGame, onNavigateToTournament, onNavigateToPro
       setIsLoading(true);
       const tournamentConfig = {
         name: `Tournoi de ${user.username}`,
-        maxParticipants: 8,
-        type: 'single-elimination'
+        maxPlayers: 8,
+        format: 'single-elimination'
       };
       const tournament = await tournamentAPI.createTournament(tournamentConfig);
-      onNavigateToTournament(tournament.tournamentId);
+      onNavigateToTournament(tournament.id);
     } catch {
       setError('Erreur lors de la création du tournoi');
     } finally {
@@ -152,20 +152,20 @@ const LobbyScreen = ({ onNavigateToGame, onNavigateToTournament, onNavigateToPro
           {availableGames.length > 0 ? (
             <div className="lobby-screen__games-grid">
               {availableGames.map(game => (
-                <div key={game.gameId} className="lobby-screen__game-card">
+                <div key={game.id} className="lobby-screen__game-card">
                   <div className="lobby-screen__game-info">
-                    <h3 className="lobby-screen__game-title">Partie de {game.host?.username}</h3>
+                    <h3 className="lobby-screen__game-title">Partie de {game.player1?.username}</h3>
                     <p className="lobby-screen__game-details">
-                      {game.currentPlayers}/{game.maxPlayers} joueurs
+                      {game.currentPlayers || 1}/{game.maxPlayers || 2} joueurs
                     </p>
                     <p className="lobby-screen__game-details">
                       Temps par tour: {game.turnTimeLimit}s
                     </p>
                   </div>
                   <ActionButton 
-                    variant="secondary" 
-                    onClick={() => handleJoinGame(game.gameId)}
-                    disabled={isLoading || game.currentPlayers >= game.maxPlayers}
+                    variant="primary" 
+                    onClick={() => handleJoinGame(game.id)}
+                    disabled={isLoading || (game.currentPlayers || 1) >= (game.maxPlayers || 2)}
                   >
                     Rejoindre
                   </ActionButton>
@@ -197,14 +197,14 @@ const LobbyScreen = ({ onNavigateToGame, onNavigateToTournament, onNavigateToPro
           {availableTournaments.length > 0 ? (
             <div className="lobby-screen__tournaments-grid">
               {availableTournaments.map(tournament => (
-                <div key={tournament.tournamentId} className="lobby-screen__tournament-card">
+                <div key={tournament.id} className="lobby-screen__tournament-card">
                   <div className="lobby-screen__tournament-info">
                     <h3 className="lobby-screen__tournament-title">{tournament.name}</h3>
                     <p className="lobby-screen__tournament-details">
-                      {tournament.currentParticipants}/{tournament.maxParticipants} participants
+                      {tournament.currentPlayers}/{tournament.maxPlayers} participants
                     </p>
                     <p className="lobby-screen__tournament-details">
-                      Type: {tournament.type}
+                      Type: {tournament.format}
                     </p>
                     <span className={`lobby-screen__tournament-status lobby-screen__tournament-status--${tournament.status}`}>
                       {tournament.status === 'waiting' && 'En attente'}
@@ -214,8 +214,8 @@ const LobbyScreen = ({ onNavigateToGame, onNavigateToTournament, onNavigateToPro
                   </div>
                   <ActionButton 
                     variant="secondary" 
-                    onClick={() => handleJoinTournament(tournament.tournamentId)}
-                    disabled={isLoading || tournament.currentParticipants >= tournament.maxParticipants || tournament.status !== 'waiting'}
+                    onClick={() => handleJoinTournament(tournament.id)}
+                    disabled={isLoading || tournament.currentPlayers >= tournament.maxPlayers || tournament.status !== 'waiting'}
                   >
                     Rejoindre
                   </ActionButton>
