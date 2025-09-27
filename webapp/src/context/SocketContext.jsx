@@ -1,8 +1,8 @@
-import React, { createContext, useReducer, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
 import SocketService from '../services/SocketService';
 import { useAuth } from './AuthContext';
 
-export const SocketContext = createContext();
+const SocketContext = createContext();
 
 const initialState = {
   isConnected: false,
@@ -65,7 +65,7 @@ export const SocketProvider = ({ children }) => {
 
   // Connection management
   const connect = useCallback(async () => {
-    if (state.isConnected || state.connectionStatus === 'connecting') return;
+    if (state.isConnected) return;
 
     dispatch({ type: 'SET_CONNECTION_STATUS', payload: 'connecting' });
     
@@ -79,7 +79,7 @@ export const SocketProvider = ({ children }) => {
       console.error('Failed to connect to socket server:', error);
       dispatch({ type: 'SET_ERROR', payload: error.message });
     }
-  }, [token, state.isConnected, state.connectionStatus]);
+  }, [token, state.isConnected]);
 
   const disconnect = useCallback(() => {
     SocketService.disconnect();
@@ -91,96 +91,88 @@ export const SocketProvider = ({ children }) => {
   useEffect(() => {
     if (isAuthenticated && token) {
       connect();
-    } else if (!isAuthenticated) {
+    } else {
       disconnect();
     }
 
     return () => {
-      if (!isAuthenticated) {
-        SocketService.cleanup();
-      }
+      disconnect();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, token]); // Connect/disconnect omis intentionnellement pour éviter les cycles
+  }, [isAuthenticated, token, connect, disconnect]);
 
-  // Socket event listeners - Setup once when authentication changes
+  // Socket event listeners
   useEffect(() => {
-    if (!isAuthenticated || !token) return;
+    if (!state.isConnected) return;
 
-    // Setup socket event listeners for the session
-    let listenersSetUp = false;
-
-    const setupSocketListeners = () => {
-      if (listenersSetUp || !SocketService.socket) return;
-
-      // Game events
-      const handleGameStateUpdate = (gameState) => {
-        dispatch({ type: 'UPDATE_GAME_STATE', payload: gameState });
-      };
-
-      const handleGameJoined = (gameData) => {
-        dispatch({ type: 'UPDATE_GAME_STATE', payload: gameData });
-      };
-
-      const handleGameLeft = () => {
-        dispatch({ type: 'UPDATE_GAME_STATE', payload: null });
-      };
-
-      // Tournament events
-      const handleTournamentStateUpdate = (tournamentState) => {
-        dispatch({ type: 'UPDATE_TOURNAMENT_STATE', payload: tournamentState });
-      };
-
-      const handleTournamentJoined = (tournamentData) => {
-        dispatch({ type: 'UPDATE_TOURNAMENT_STATE', payload: tournamentData });
-      };
-
-      const handleTournamentLeft = () => {
-        dispatch({ type: 'UPDATE_TOURNAMENT_STATE', payload: null });
-      };
-
-      // Connection events
-      const handleDisconnect = (reason) => {
-        console.log('Socket disconnected:', reason);
-        dispatch({ type: 'SET_CONNECTION_STATUS', payload: 'disconnected' });
-        dispatch({ type: 'CLEAR_STATES' });
-      };
-
-      const handleReconnect = () => {
-        console.log('Socket reconnected');
-        dispatch({ type: 'SET_CONNECTION_STATUS', payload: 'connected' });
-        dispatch({ type: 'SET_LAST_CONNECTED', payload: new Date().toISOString() });
-      };
-
-      const handleReconnectAttempt = (attemptNumber) => {
-        console.log('Socket reconnect attempt:', attemptNumber);
-        dispatch({ type: 'SET_CONNECTION_STATUS', payload: 'reconnecting' });
-        dispatch({ type: 'SET_RECONNECT_ATTEMPTS', payload: attemptNumber });
-      };
-
-      // Register listeners only once per session
-      SocketService.on('gameStateUpdate', handleGameStateUpdate);
-      SocketService.on('gameJoined', handleGameJoined);
-      SocketService.on('gameLeft', handleGameLeft);
-      SocketService.on('tournamentStateUpdate', handleTournamentStateUpdate);
-      SocketService.on('tournamentJoined', handleTournamentJoined);
-      SocketService.on('tournamentLeft', handleTournamentLeft);
-      SocketService.on('disconnect', handleDisconnect);
-      SocketService.on('reconnect', handleReconnect);
-      SocketService.on('reconnect_attempt', handleReconnectAttempt);
-
-      listenersSetUp = true;
+    // Game events
+    const handleGameStateUpdate = (gameState) => {
+      dispatch({ type: 'UPDATE_GAME_STATE', payload: gameState });
     };
 
-    // Wait a bit for socket to be ready, then setup listeners
-    const timeoutId = setTimeout(setupSocketListeners, 100);
+    const handleGameJoined = (gameData) => {
+      dispatch({ type: 'UPDATE_GAME_STATE', payload: gameData });
+    };
 
+    const handleGameLeft = () => {
+      dispatch({ type: 'UPDATE_GAME_STATE', payload: null });
+    };
+
+    // Tournament events
+    const handleTournamentStateUpdate = (tournamentState) => {
+      dispatch({ type: 'UPDATE_TOURNAMENT_STATE', payload: tournamentState });
+    };
+
+    const handleTournamentJoined = (tournamentData) => {
+      dispatch({ type: 'UPDATE_TOURNAMENT_STATE', payload: tournamentData });
+    };
+
+    const handleTournamentLeft = () => {
+      dispatch({ type: 'UPDATE_TOURNAMENT_STATE', payload: null });
+    };
+
+    // Connection events
+    const handleDisconnect = (reason) => {
+      console.log('Socket disconnected:', reason);
+      dispatch({ type: 'SET_CONNECTION_STATUS', payload: 'disconnected' });
+      dispatch({ type: 'CLEAR_STATES' });
+    };
+
+    const handleReconnect = () => {
+      console.log('Socket reconnected');
+      dispatch({ type: 'SET_CONNECTION_STATUS', payload: 'connected' });
+      dispatch({ type: 'SET_LAST_CONNECTED', payload: new Date().toISOString() });
+    };
+
+    const handleReconnectAttempt = (attemptNumber) => {
+      console.log('Socket reconnect attempt:', attemptNumber);
+      dispatch({ type: 'SET_CONNECTION_STATUS', payload: 'reconnecting' });
+      dispatch({ type: 'SET_RECONNECT_ATTEMPTS', payload: attemptNumber });
+    };
+
+    // Register listeners
+    SocketService.on('gameStateUpdate', handleGameStateUpdate);
+    SocketService.on('gameJoined', handleGameJoined);
+    SocketService.on('gameLeft', handleGameLeft);
+    SocketService.on('tournamentStateUpdate', handleTournamentStateUpdate);
+    SocketService.on('tournamentJoined', handleTournamentJoined);
+    SocketService.on('tournamentLeft', handleTournamentLeft);
+    SocketService.on('disconnect', handleDisconnect);
+    SocketService.on('reconnect', handleReconnect);
+    SocketService.on('reconnect_attempt', handleReconnectAttempt);
+
+    // Cleanup
     return () => {
-      clearTimeout(timeoutId);
-      listenersSetUp = false;
-      // SocketService cleanup will handle removing listeners
+      SocketService.off('gameStateUpdate', handleGameStateUpdate);
+      SocketService.off('gameJoined', handleGameJoined);
+      SocketService.off('gameLeft', handleGameLeft);
+      SocketService.off('tournamentStateUpdate', handleTournamentStateUpdate);
+      SocketService.off('tournamentJoined', handleTournamentJoined);
+      SocketService.off('tournamentLeft', handleTournamentLeft);
+      SocketService.off('disconnect', handleDisconnect);
+      SocketService.off('reconnect', handleReconnect);
+      SocketService.off('reconnect_attempt', handleReconnectAttempt);
     };
-  }, [isAuthenticated, token]);
+  }, [state.isConnected]);
 
   // Game actions
   const joinGame = useCallback((gameId) => {
@@ -216,4 +208,12 @@ export const SocketProvider = ({ children }) => {
   };
 
   return <SocketContext.Provider value={value}>{children}</SocketContext.Provider>;
+};
+
+export const useSocket = () => {
+  const context = useContext(SocketContext);
+  if (context === undefined) {
+    throw new Error('useSocket must be used within a SocketProvider');
+  }
+  return context;
 };

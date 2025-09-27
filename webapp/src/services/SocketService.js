@@ -16,21 +16,12 @@ class SocketService {
       return Promise.resolve();
     }
 
-    // Clean up any existing socket before creating new one
-    if (this.socket) {
-      this.cleanup();
-    }
-
     return new Promise((resolve, reject) => {
       try {
         const options = {
-          transports: ['websocket', 'polling'],
-          timeout: 10000,
-          autoConnect: false, // We'll connect manually
-          reconnection: true,
-          reconnectionAttempts: this.maxReconnectAttempts,
-          reconnectionDelay: this.reconnectDelay,
-          reconnectionDelayMax: 5000,
+          transports: ['websocket'],
+          timeout: 5000,
+          forceNew: true,
         };
 
         // Add authentication token if provided
@@ -52,19 +43,24 @@ class SocketService {
         this.socket.on('connect_error', (error) => {
           console.error('Socket connection error:', error);
           this.isConnected = false;
-          reject(error);
+
+          if (this.reconnectAttempts === 0) {
+            reject(error);
+          }
         });
 
         // Disconnection
         this.socket.on('disconnect', (reason) => {
           console.log('Socket disconnected:', reason);
           this.isConnected = false;
-          
-          // Only auto-reconnect for certain reasons
-          if (reason === 'io server disconnect' || reason === 'io client disconnect') {
-            console.log('Not auto-reconnecting for reason:', reason);
+
+          // Attempt reconnection for certain disconnect reasons
+          if (reason === 'io server disconnect') {
+            // Server initiated disconnect, don't reconnect
             return;
           }
+
+          this.handleReconnection();
         });
 
         // Reconnection attempt
@@ -86,9 +82,6 @@ class SocketService {
           this.isConnected = false;
         });
 
-        // Manual connection
-        this.socket.connect();
-
       } catch (error) {
         console.error('Socket connection setup error:', error);
         reject(error);
@@ -99,15 +92,13 @@ class SocketService {
   disconnect() {
     if (this.socket) {
       console.log('Disconnecting socket...');
-      this.isConnected = false;
       this.socket.disconnect();
       this.socket = null;
+      this.isConnected = false;
       this.reconnectAttempts = 0;
     }
   }
 
-  // Remove the manual reconnection logic since socket.io handles it
-  /*
   handleReconnection() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       console.error('Max reconnection attempts reached');
@@ -121,7 +112,6 @@ class SocketService {
       }
     }, this.reconnectDelay * Math.pow(2, this.reconnectAttempts));
   }
-  */
 
   // Event listeners
   on(event, callback) {
@@ -209,14 +199,7 @@ class SocketService {
     });
     this.listeners.clear();
 
-    if (this.socket) {
-      this.socket.removeAllListeners();
-      this.socket.disconnect();
-      this.socket = null;
-    }
-    
-    this.isConnected = false;
-    this.reconnectAttempts = 0;
+    this.disconnect();
   }
 }
 
