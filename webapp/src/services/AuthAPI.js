@@ -42,16 +42,16 @@ class AuthAPI {
    * Login user with credentials
    */
   async login(credentials) {
-    const { username, password } = credentials;
+    const { email, password } = credentials;
 
-    if (!username || !password) {
-      throw new Error('Username and password are required');
+    if (!email || !password) {
+      throw new Error('Email and password are required');
     }
 
     try {
       const response = await this.request(API_CONFIG.ENDPOINTS.AUTH.LOGIN, {
         method: 'POST',
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email, password }),
       });
 
       if (!response.token || !response.user) {

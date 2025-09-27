@@ -6,7 +6,7 @@ import './LoginScreen.css';
 
 const LoginScreen = ({ onSwitchToRegister }) => {
   const [formData, setFormData] = useState({
-    username: '',
+    email: '',
     password: ''
   });
   const [error, setError] = useState('');
@@ -27,7 +27,7 @@ const LoginScreen = ({ onSwitchToRegister }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.username || !formData.password) {
+    if (!formData.email || !formData.password) {
       setError('Veuillez remplir tous les champs');
       return;
     }
@@ -48,7 +48,7 @@ const LoginScreen = ({ onSwitchToRegister }) => {
     <div className="login-screen">
       <div className="login-screen__container">
         <div className="login-screen__header">
-          <h1 className="login-screen__title">007</h1>
+          <h1 className="login-screen__title">Tactical Card Game</h1>
           <p className="login-screen__subtitle">Connectez-vous pour commencer</p>
         </div>
 
@@ -60,19 +60,19 @@ const LoginScreen = ({ onSwitchToRegister }) => {
           )}
 
           <div className="login-screen__field">
-            <label htmlFor="username" className="login-screen__label">
-              Nom d'utilisateur
+            <label htmlFor="email" className="login-screen__label">
+              Email
             </label>
             <input
-              id="username"
-              name="username"
-              type="text"
-              value={formData.username}
+              id="email"
+              name="email"
+              type="email"
+              value={formData.email}
               onChange={handleInputChange}
               className="login-screen__input"
-              placeholder="Votre nom d'utilisateur"
+              placeholder="votre@email.com"
               disabled={isLoading}
-              autoComplete="username"
+              autoComplete="email"
               required
             />
           </div>
