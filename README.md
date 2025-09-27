@@ -1,6 +1,6 @@
 # Tactical Card Game
 
-A tactical multiplayer online card game with both mobile and web clients, built with React Native, React, and Node.js.
+A tactical multiplayer online card game built with React Native and Node.js.
 
 ## Project Structure
 
@@ -15,15 +15,6 @@ tactical-card-game/
 │   │   └── utils/          # Utility functions
 │   ├── App.js             # Main app component
 │   └── package.json       # Client dependencies
-├── webapp/                # React web application
-│   ├── src/
-│   │   ├── components/     # Reusable web UI components
-│   │   ├── screens/        # Screen components for web
-│   │   ├── services/       # API and Socket services (web adapted)
-│   │   ├── context/        # React Context providers (web adapted)
-│   │   └── utils/          # Utility functions
-│   ├── App.js             # Main web app component
-│   └── package.json       # Webapp dependencies
 ├── server/                # Node.js Express server
 │   ├── src/
 │   │   ├── config/        # Database and app configuration
@@ -49,34 +40,22 @@ tactical-card-game/
 
 1. Clone the repository
 2. Install dependencies for all projects:
-
    ```bash
    npm run install:all
    ```
 
 3. Set up environment variables:
-
    ```bash
    cp server/.env.example server/.env
    # Edit server/.env with your database credentials
    ```
 
 4. Start the development servers:
-
    ```bash
-   # Start all (server + mobile client + webapp)
    npm run dev
-   
-   # Or start individually:
-   npm run server:dev    # Server only
-   npm run client:dev    # Mobile app only
-   npm run webapp:dev    # Web app only
    ```
 
-This will start:
-- Server on port 3000
-- React Native client (mobile)
-- React webapp on port 5174 (default Vite port)
+This will start both the server (port 3000) and the React Native client.
 
 ### Development
 

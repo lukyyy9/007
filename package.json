@@ -4,13 +4,10 @@
   "description": "A tactical multiplayer online card game",
   "main": "index.js",
   "scripts": {
-    "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\" \"npm run webapp:dev\"",
+    "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
     "server:dev": "cd server && npm run dev",
     "client:dev": "cd client && npm start",
-    "webapp:dev": "cd webapp && npm run dev",
-    "webapp:build": "cd webapp && npm run build",
-    "webapp:preview": "cd webapp && npm run preview",
-    "install:all": "npm install && cd server && npm install && cd ../client && npm install && cd ../webapp && npm install",
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install",
     "verify": "node verify-setup.js"
   },
   "keywords": [
