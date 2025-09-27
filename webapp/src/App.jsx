@@ -1,21 +1,12 @@
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
 // Context Providers
 import { AuthProvider, GameProvider, TournamentProvider, SocketProvider } from './context';
 import { useAuth } from './context/AuthContext';
 
 // Screens
-import { 
-  LoginScreen, 
-  RegisterScreen, 
-  LobbyScreen,
-  ProfileScreen,
-  GameRoomScreen,
-  GameBoardScreen,
-  TournamentScreen,
-  TournamentBracketScreen
-} from './screens';
+import { LoginScreen, RegisterScreen, LobbyScreen } from './screens';
 
 // Global styles
 import './App.css';
@@ -60,60 +51,41 @@ const AuthScreens = () => {
 
 // Main app component
 const AppContent = () => {
-  return (
-    <Router>
-      <AppRoutes />
-    </Router>
-  );
-};
-
-// Routes component (needs to be inside Router to use useNavigate)
-const AppRoutes = () => {
-  const navigate = useNavigate();
-
   const handleNavigateToGame = (gameId) => {
-    navigate(`/game/${gameId}`);
+    // TODO: Implement navigation to game screen
+    console.log('Navigate to game:', gameId);
   };
 
   const handleNavigateToTournament = (tournamentId) => {
-    navigate(`/tournament/${tournamentId}`);
+    // TODO: Implement navigation to tournament screen
+    console.log('Navigate to tournament:', tournamentId);
   };
 
   const handleNavigateToProfile = () => {
-    navigate('/profile');
+    // TODO: Implement navigation to profile screen
+    console.log('Navigate to profile');
   };
 
   return (
-    <AuthWrapper>
-      <Routes>
-        <Route 
-          path="/" 
-          element={
-            <LobbyScreen 
-              onNavigateToGame={handleNavigateToGame}
-              onNavigateToTournament={handleNavigateToTournament}
-              onNavigateToProfile={handleNavigateToProfile}
-            />
-          } 
-        />
-        <Route path="/lobby" element={<Navigate to="/" replace />} />
-        
-        {/* Profile Route */}
-        <Route path="/profile" element={<ProfileScreen />} />
-        
-        {/* Game Routes */}
-        <Route path="/game/:gameId" element={<GameRoomScreen />} />
-        <Route path="/game/:gameId/board" element={<GameBoardScreen />} />
-        
-        {/* Tournament Routes */}
-        <Route path="/tournament" element={<TournamentScreen />} />
-        <Route path="/tournament/:tournamentId" element={<TournamentBracketScreen />} />
-        <Route path="/tournament/:tournamentId/bracket" element={<TournamentBracketScreen />} />
-        
-        {/* Catch all route */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </AuthWrapper>
+    <Router>
+      <AuthWrapper>
+        <Routes>
+          <Route 
+            path="/" 
+            element={
+              <LobbyScreen 
+                onNavigateToGame={handleNavigateToGame}
+                onNavigateToTournament={handleNavigateToTournament}
+                onNavigateToProfile={handleNavigateToProfile}
+              />
+            } 
+          />
+          <Route path="/lobby" element={<Navigate to="/" replace />} />
+          {/* TODO: Add more routes for game, tournament, profile screens */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthWrapper>
+    </Router>
   );
 };
 

@@ -217,12 +217,3 @@ export const SocketProvider = ({ children }) => {
 
   return <SocketContext.Provider value={value}>{children}</SocketContext.Provider>;
 };
-
-// Hook pour utiliser le contexte Socket
-export const useSocket = () => {
-  const context = React.useContext(SocketContext);
-  if (!context) {
-    throw new Error('useSocket must be used within a SocketProvider');
-  }
-  return context;
-};

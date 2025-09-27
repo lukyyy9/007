@@ -105,7 +105,7 @@ class TournamentAPI {
    */
   async getAvailableTournaments() {
     try {
-      const response = await this.request('/api/tournament', {
+      const response = await this.request('/api/tournament/available', {
         method: 'GET',
       });
 

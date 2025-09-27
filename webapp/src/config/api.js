@@ -22,10 +22,7 @@ const API_CONFIG = {
     GAME: {
       CREATE: '/api/game/create',
       JOIN: '/api/game/join',
-      STATUS: '/api/game/status',
-      LIST: '/api/game',
-      HISTORY: '/api/game/history',
-      LEAVE: '/api/game'
+      STATUS: '/api/game/status'
     },
     TOURNAMENT: {
       CREATE: '/api/tournament/create',
