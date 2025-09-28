@@ -73,10 +73,10 @@ const gameSettingsService = new GameSettingsService();
 router.post('/create', auth.authenticateToken, validation.validateGameCreation, async (req, res) => {
   try {
     const { gameConfig = {}, name } = req.body;
-    
+
     // Create and validate game configuration using the service
     const finalConfig = gameSettingsService.createGameConfiguration(
-      gameConfig, 
+      gameConfig,
       name || `${req.user.username}'s Game`
     );
 
@@ -365,7 +365,7 @@ router.get('/', auth.optionalAuth, async (req, res) => {
     const { status = 'waiting', limit = 20, offset = 0 } = req.query;
 
     const whereClause = { status };
-    
+
     // If user is authenticated, exclude their own games from the list
     if (req.user) {
       whereClause.player1Id = { [require('sequelize').Op.ne]: req.user.id };
@@ -602,9 +602,9 @@ router.get('/config/options', async (req, res) => {
 router.post('/config/validate', async (req, res) => {
   try {
     const { gameConfig } = req.body;
-    
+
     const validation = gameSettingsService.validateGameConfig(gameConfig);
-    const displayInfo = validation.isValid ? 
+    const displayInfo = validation.isValid ?
       gameSettingsService.getConfigDisplayInfo(validation.config) : null;
 
     res.json({

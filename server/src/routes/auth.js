@@ -71,10 +71,9 @@ const router = express.Router();
  *               $ref: '#/components/schemas/Error'
  */
 // Register new user
-router.post('/register', validation.validateUserRegistration, async (req, res) => {
+router.post('/register', async (req, res) => {
   try {
     const { username, email, password } = req.body;
-
     // Check if user already exists
     const existingUser = await User.findOne({
       where: {
@@ -89,7 +88,7 @@ router.post('/register', validation.validateUserRegistration, async (req, res) =
       return res.status(409).json({
         error: 'User already exists',
         code: 'USER_EXISTS',
-        details: existingUser.username === username ? 'Username taken' : 'Email already registered'
+        details: existingUser.username === username ? 'Ce pseudo est déjà pris' : 'Email déjà enregistré'
       });
     }
 
@@ -177,7 +176,7 @@ router.post('/register', validation.validateUserRegistration, async (req, res) =
  *               $ref: '#/components/schemas/Error'
  */
 // Login user
-router.post('/login', validation.validateUserLogin, async (req, res) => {
+router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
 
@@ -193,7 +192,7 @@ router.post('/login', validation.validateUserLogin, async (req, res) => {
 
     if (!user || !user.isActive) {
       return res.status(401).json({
-        error: 'Invalid credentials',
+        error: 'Ce pseudo ou email est inconnu, inscrivez-vous !',
         code: 'INVALID_CREDENTIALS'
       });
     }
@@ -202,7 +201,7 @@ router.post('/login', validation.validateUserLogin, async (req, res) => {
     const isValidPassword = await user.validatePassword(password);
     if (!isValidPassword) {
       return res.status(401).json({
-        error: 'Invalid credentials',
+        error: 'Mot de passe incorrect',
         code: 'INVALID_CREDENTIALS'
       });
     }
