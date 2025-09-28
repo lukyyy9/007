@@ -35,7 +35,7 @@ export default function Login() {
     <View style={{ flex: 1, padding: 24, gap: 12, justifyContent: "center" }}>
       <Text
         style={{
-          width: "50%",
+          width: "70%",
           marginHorizontal: "auto",
           fontSize: 20,
           fontWeight: "600",
@@ -43,8 +43,9 @@ export default function Login() {
           marginBottom: 20,
         }}
       >
-        Bienvenue agent 007,
-        <br /> ta mission commence après authentification.
+        Bienvenue agent 007, 
+        {"\n"}
+        ta mission commence après authentification.
       </Text>
       <FormTextInput
         control={control}
